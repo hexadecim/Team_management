@@ -1,0 +1,5 @@
+
+> resource-service@1.0.0 start
+> node index.js
+
+[Resource Service] Listening on port 4001
