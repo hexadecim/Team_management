@@ -1,46 +1,35 @@
 const express = require('express');
-const axios = require('axios');
+const { db } = require('@team-mgmt/shared');
 const cors = require('cors');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-let stats = {
-    totalCreated: 0,
-    byType: {}
-};
+/**
+ * High-performance aggregation endpoint.
+ * Directly queries the Materialized View for instant dashboard data.
+ */
+app.get('/stats', async (req, res) => {
+    try {
+        const result = await db.queryCore('SELECT * FROM core.dashboard_analytics_summary');
 
-// Event handler
-app.post('/events', (req, res) => {
-    const { eventType, data } = req.body;
-    console.log(`[Analytics Service] Processing event: ${eventType}`);
+        if (result.rows.length === 0) {
+            return res.send({
+                avg_utilization: 0,
+                bench_count: 0,
+                monthly_utilization: []
+            });
+        }
 
-    if (eventType === 'RESOURCE_CREATED') {
-        stats.totalCreated++;
-        const type = data.type || 'unknown';
-        stats.byType[type] = (stats.byType[type] || 0) + 1;
+        res.send(result.rows[0]);
+    } catch (error) {
+        console.error('[Analytics Service Error]', error);
+        res.status(500).send({ error: 'Internal server error fetching analytics' });
     }
-
-    res.send({ status: 'OK' });
-});
-
-app.get('/stats', (req, res) => {
-    res.send(stats);
 });
 
 const PORT = 4002;
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
     console.log(`[Analytics Service] Listening on port ${PORT}`);
-
-    // Register subscription
-    try {
-        await axios.post('http://localhost:4005/subscribe', {
-            eventType: 'RESOURCE_CREATED',
-            url: 'http://localhost:4002/events'
-        });
-        console.log('[Analytics Service] Subscribed to RESOURCE_CREATED');
-    } catch (err) {
-        console.warn('[Analytics Service] Failed to subscribe to Event Bus. Is it running?');
-    }
 });

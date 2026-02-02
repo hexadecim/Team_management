@@ -3,4 +3,3 @@
 > node index.js
 
 [Event Bus] Listening on port 4005
-[Event Bus] Subscribed http://localhost:4002/events to RESOURCE_CREATED

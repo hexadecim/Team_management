@@ -1,6 +1,6 @@
 #!/bin/bash
 # Use absolute paths to avoid confusion
-BASE_DIR="/Users/sanjayrana/AILearning/Team Management"
+BASE_DIR="/Users/sanjayrana/AILearning/Team_management"
 
 echo "Starting Event Bus..."
 cd "$BASE_DIR/apps/event-bus" && npm start > event-bus.log 2>&1 &

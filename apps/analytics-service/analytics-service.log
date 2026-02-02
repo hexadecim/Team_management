@@ -3,4 +3,3 @@
 > node index.js
 
 [Analytics Service] Listening on port 4002
-[Analytics Service] Subscribed to RESOURCE_CREATED

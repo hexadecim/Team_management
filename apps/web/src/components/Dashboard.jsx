@@ -1,11 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, Cell
 } from 'recharts';
 
 const Dashboard = ({ employees, allocations }) => {
     const [range, setRange] = useState('Quarterly'); // Quarterly, Half-Yearly, Annual
     const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+
+    // Color coding function for utilization
+    const getUtilizationColor = (utilization) => {
+        if (utilization < 25) return '#ef4444'; // Red for low utilization
+        if (utilization <= 75) return '#f59e0b'; // Amber for medium utilization
+        return '#10b981'; // Green for high utilization
+    };
 
     const chartData = useMemo(() => {
         return months.map((m, idx) => {
@@ -128,7 +135,11 @@ const Dashboard = ({ employees, allocations }) => {
                                 cursor={{ fill: 'rgba(0,0,0,0.02)' }}
                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }}
                             />
-                            <Bar dataKey="utilization" fill="#000" radius={[4, 4, 0, 0]} barSize={40} />
+                            <Bar dataKey="utilization" radius={[4, 4, 0, 0]} barSize={40}>
+                                {filteredData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={getUtilizationColor(entry.utilization)} />
+                                ))}
+                            </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -157,3 +168,4 @@ const Dashboard = ({ employees, allocations }) => {
 };
 
 export default Dashboard;
+

@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import './index.css';
 import AllocationCalendar from './components/AllocationCalendar';
 import Dashboard from './components/Dashboard';
+import RoleManager from './components/RoleManager';
+import UserManager from './components/UserManager';
+import ProjectManager from './components/ProjectManager';
+import Logo from './components/Logo';
+import { useSessionTimeout } from './hooks/useSessionTimeout';
 
 const API_BASE = 'http://localhost:4001';
 
@@ -33,8 +38,51 @@ const INITIAL_ALLOCATION_FORM = {
   endDate: ''
 };
 
+const decodeToken = (token) => {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch (e) {
+    return null;
+  }
+};
+
 function App() {
-  const [view, setView] = useState('dashboard'); // 'dashboard', 'employees', or 'allocation'
+  const [token, setToken] = useState(localStorage.getItem('vibe-token'));
+  const [claims, setClaims] = useState(token ? decodeToken(token)?.claims : {});
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  // Browser close detection
+  useEffect(() => {
+    if (!token) return;
+
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable async logout on browser close
+      const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
+      navigator.sendBeacon(
+        `${API_BASE}/auth/logout`,
+        blob
+      );
+      // Note: Authorization header cannot be set with sendBeacon
+      // The session will be invalidated based on cookies or other mechanisms
+      // For now, we'll clear local storage
+      localStorage.removeItem('vibe-token');
+      localStorage.removeItem('vibe-refresh-token');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [token]);
+
+  const [view, setView] = useState('dashboard');
+  const [adminView, setAdminView] = useState('users'); // 'users' or 'roles'
+  const [masterView, setMasterView] = useState('employees'); // 'employees' or 'projects'
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [allocations, setAllocations] = useState([]);
@@ -44,14 +92,8 @@ function App() {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [allocData, setAllocData] = useState(INITIAL_ALLOCATION_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toasts, setToasts] = useState([]);
-
-  useEffect(() => {
-    fetchEmployees();
-    fetchProjects();
-    fetchAllocations();
-  }, [search]);
 
   const addToast = (message, type = 'info') => {
     const id = Date.now();
@@ -61,25 +103,97 @@ function App() {
     }, 3000);
   };
 
+  const handleLogout = async () => {
+    try {
+      // Call logout endpoint
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      // Clear tokens regardless of API call result
+      localStorage.removeItem('vibe-token');
+      localStorage.removeItem('vibe-refresh-token');
+      setToken(null);
+      setClaims({});
+      setView('dashboard');
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Store both access and refresh tokens
+        localStorage.setItem('vibe-token', data.accessToken);
+        localStorage.setItem('vibe-refresh-token', data.refreshToken);
+        setToken(data.accessToken);
+        setClaims(decodeToken(data.accessToken).claims);
+        addToast('Welcome back!', 'success');
+      } else {
+        const error = await res.json();
+        addToast(error.error || 'Invalid credentials', 'error');
+      }
+    } catch (err) {
+      addToast('Login failed', 'error');
+    }
+  };
+
+  // Session timeout hook
+  const { showWarning, handleStayLoggedIn } = useSessionTimeout(token, handleLogout, addToast);
+
+  useEffect(() => {
+    if (token) {
+      fetchEmployees();
+      fetchProjects();
+      fetchAllocations();
+    }
+  }, [search, token]);
+
+  const canView = (permission) => {
+    const perm = claims?.[permission];
+    return perm === 'r' || perm === 'rw';
+  };
+  const canEdit = (permission) => claims?.[permission] === 'rw';
+
   const fetchEmployees = async () => {
     try {
       const url = search ? `${API_BASE}/employees?q=${search}` : `${API_BASE}/employees`;
-      const res = await fetch(url);
-      setEmployees(await res.json());
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setEmployees(await res.json());
+      else console.error('Fetch employees failed:', res.status);
     } catch (err) { console.error(err); }
   };
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_BASE}/projects`);
-      setProjects(await res.json());
+      const res = await fetch(`${API_BASE}/projects`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setProjects(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const fetchAllocations = async () => {
     try {
-      const res = await fetch(`${API_BASE}/allocations`);
-      setAllocations(await res.json());
+      const res = await fetch(`${API_BASE}/allocations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setAllocations(await res.json());
     } catch (err) { console.error(err); }
   };
 
@@ -119,13 +233,21 @@ function App() {
     try {
       const method = editingId ? 'PUT' : 'POST';
       const url = editingId ? `${API_BASE}/employees/${editingId}` : `${API_BASE}/employees`;
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
+      if (!res.ok) {
+        const err = await res.json();
+        addToast(err.error || 'Failed to save employee', 'error');
+        return;
+      }
       setIsPanelOpen(false);
-      addToast(editingId ? 'Employee updated' : 'Employee created');
+      addToast(editingId ? 'Employee updated' : 'Employee created', 'success');
       fetchEmployees();
     } catch (err) { addToast('Error saving employee', 'error'); }
   };
@@ -135,7 +257,10 @@ function App() {
     const { id } = deleteConfirm;
 
     try {
-      const res = await fetch(`${API_BASE}/employees/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/employees/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
       if (res.ok) {
         addToast('Employee removed');
@@ -154,6 +279,45 @@ function App() {
     }
   };
 
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE}/employees/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        addToast(data.message, 'success');
+        fetchEmployees();
+      } else {
+        if (data.details) {
+          // Validation errors
+          const errorMsg = `Upload failed:\n${data.details.join('\n')}${data.totalErrors > 10 ? `\n...and ${data.totalErrors - 10} more` : ''}`;
+          alert(errorMsg);
+        } else {
+          addToast(data.error || 'Failed to upload employees', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('[Bulk Upload Error]', err);
+      addToast('Error during bulk upload', 'error');
+    } finally {
+      // Clear file input
+      e.target.value = null;
+    }
+  };
+
   const handleSubmitAllocation = async (e) => {
     e.preventDefault();
     const project = projects.find(p => p.id === allocData.projectId);
@@ -162,91 +326,222 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/allocations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
 
       if (res.status === 400) {
         const errData = await res.json();
-        addToast(`Capacity Exceeded: Total would be ${errData.total}%`, 'error');
+        addToast(errData.error, 'error');
+        return;
+      }
+
+      if (!res.ok) {
+        addToast('Failed to create allocation', 'error');
         return;
       }
 
       setIsAllocPanelOpen(false);
-      addToast('Allocation successful');
+      addToast('Allocation successful', 'success');
       fetchAllocations();
+      fetchEmployees(); // Sum changed
     } catch (err) { addToast('Error creating allocation', 'error'); }
   };
+
+  if (!token) {
+    return (
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <Logo size={140} />
+          </div>
+          <div className="card">
+            <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Sign In</h2>
+            <form onSubmit={handleLogin}>
+              <div className="input-group">
+                <label>Username</label>
+                <input value={username} onChange={e => setUsername(e.target.value)} placeholder="admin or employee" />
+              </div>
+              <div className="input-group">
+                <label>Password</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="admin or emp" />
+              </div>
+              <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '1rem' }}>Login</button>
+            </form>
+          </div>
+        </div>
+        <div className="toast-container">
+          {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container">
       <header>
         <h1>Resource System <span style={{ opacity: 0.3 }}>/</span> {
           view === 'dashboard' ? 'Analytics Dashboard' :
-            view === 'employees' ? 'Employee List' : 'Allocation Board'
+            view === 'employees' ? 'Master record' :
+              view === 'projects' ? 'Project Master' :
+                view === 'allocation' ? 'Planning Board' : 'Administration'
         }</h1>
-        <div className="status-badge">Ecosystem Online</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            className="action-btn"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            style={{ background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)', padding: '0.4rem 0.8rem' }}
+          >
+            {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+          </button>
+          <div className="status-badge">Sanjay Rana Product</div>
+          <button className="action-btn" onClick={handleLogout} style={{ background: 'var(--col-danger)', color: '#ffffff', padding: '0.4rem 1rem' }}>Logout</button>
+        </div>
       </header>
 
       <div className="tabs">
-        <div className={`tab ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</div>
-        <div className={`tab ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>Employee List</div>
-        <div className={`tab ${view === 'allocation' ? 'active' : ''}`} onClick={() => setView('allocation')}>Allocation Board</div>
+        {canView('dashboard') && <div className={`tab ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</div>}
+        {canView('employee_list') && <div className={`tab ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>Master record</div>}
+        {canView('allocation') && <div className={`tab ${view === 'allocation' ? 'active' : ''}`} onClick={() => setView('allocation')}>Planning Board</div>}
+        {canView('administration') && <div className={`tab ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Administration</div>}
       </div>
 
-      {view === 'dashboard' && <Dashboard employees={employees} allocations={allocations} />}
+      {view === 'dashboard' && canView('dashboard') && <Dashboard employees={employees} allocations={allocations} />}
 
-      {view === 'employees' && (
-        <>
-          <div className="control-bar">
-            <div className="search-field">
-              <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {view === 'admin' && canView('administration') && (
+        <div className="card">
+          <div className="tabs" style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+            <div
+              className={`tab ${adminView === 'users' ? 'active' : ''}`}
+              onClick={() => setAdminView('users')}
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+            >
+              User Management
             </div>
-            <button className="action-btn" onClick={() => handleOpenPanel()}>+ Add Employee</button>
+            <div
+              className={`tab ${adminView === 'roles' ? 'active' : ''}`}
+              onClick={() => setAdminView('roles')}
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+            >
+              Role Management
+            </div>
           </div>
-          <div className="card">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Skills</th>
-                  <th>Project</th>
-                  <th>Allocation</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map(emp => (
-                  <tr key={emp.id}>
-                    <td><strong>{emp.firstName} {emp.lastName}</strong></td>
-                    <td>
-                      <div className="chip-container">
-                        {emp.primarySkills.map(s => <span key={s} className="chip primary">{s}</span>)}
-                      </div>
-                    </td>
-                    <td><span className="chip project">{emp.projectName || 'Unassigned'}</span></td>
-                    <td><strong>{emp.allocation}%</strong></td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="action-btn" style={{ padding: '0.4rem 0.8rem' }} onClick={() => handleOpenPanel(emp)}>Edit</button>
-                        <button className="action-btn" style={{ padding: '0.4rem 0.8rem', background: '#ef4444' }} onClick={() => setDeleteConfirm({ id: emp.id, name: `${emp.firstName} ${emp.lastName}` })}>Remove</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+
+          {adminView === 'users' && <UserManager token={token} />}
+          {adminView === 'roles' && <RoleManager token={token} />}
+        </div>
       )}
 
-      {view === 'allocation' && (
+      {view === 'employees' && (
+        <div className="card">
+          <div className="tabs" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+            <div
+              className={`tab ${masterView === 'employees' ? 'active' : ''}`}
+              onClick={() => setMasterView('employees')}
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+            >
+              Employee Master
+            </div>
+            {canView('administration') && (
+              <div
+                className={`tab ${masterView === 'projects' ? 'active' : ''}`}
+                onClick={() => setMasterView('projects')}
+                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+              >
+                Project Master
+              </div>
+            )}
+          </div>
+
+          {masterView === 'employees' && canView('employee_list') && (
+            <>
+              <div className="control-bar" style={{ marginBottom: '1rem' }}>
+                <div className="search-field">
+                  <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {canEdit('employee_list') && (
+                    <>
+                      <input
+                        type="file"
+                        accept=".csv, .xlsx, .xls"
+                        id="bulk-upload-input"
+                        style={{ display: 'none' }}
+                        onChange={handleBulkUpload}
+                      />
+                      <button
+                        className="action-btn"
+                        style={{ background: 'var(--card-bg)', color: 'var(--fg)', border: '1px solid var(--border)' }}
+                        onClick={() => document.getElementById('bulk-upload-input').click()}
+                      >
+                        📤 Bulk Upload
+                      </button>
+                      <button className="action-btn" onClick={() => handleOpenPanel()}>+ Add Employee</button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Skills</th>
+                      <th>Project</th>
+                      <th>Allocation</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map(emp => (
+                      <tr key={emp.id}>
+                        <td><strong>{emp.firstName} {emp.lastName}</strong></td>
+                        <td>
+                          <div className="chip-container">
+                            {emp.primarySkills.map(s => <span key={s} className="chip primary">{s}</span>)}
+                          </div>
+                        </td>
+                        <td><span className="chip project">{emp.projectName || 'Unassigned'}</span></td>
+                        <td><strong>{emp.allocation}%</strong></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {canEdit('employee_list') && (
+                              <>
+                                <button className="action-btn" style={{ padding: '0.4rem 0.8rem' }} onClick={() => handleOpenPanel(emp)}>Edit</button>
+                                <button className="action-btn" style={{ padding: '0.4rem 0.8rem', background: '#ef4444' }} onClick={() => setDeleteConfirm({ id: emp.id, name: `${emp.firstName} ${emp.lastName}` })}>Remove</button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {masterView === 'projects' && canView('administration') && (
+            <ProjectManager
+              token={token}
+              projects={projects}
+              onProjectCreated={fetchProjects}
+              addToast={addToast}
+            />
+          )}
+        </div>
+      )}
+
+      {view === 'allocation' && canView('allocation') && (
         <div className="card" style={{ padding: 0 }}>
           <AllocationCalendar
             employees={employees}
             allocations={allocations}
             projects={projects}
-            onAddAllocation={handleOpenAllocPanel}
+            onAddAllocation={canEdit('allocation') ? handleOpenAllocPanel : undefined}
           />
         </div>
       )}
@@ -280,7 +575,7 @@ function App() {
               <label>Project</label>
               <select value={allocData.projectId} onChange={e => setAllocData({ ...allocData, projectId: e.target.value })}>
                 <option value="">Select Project</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.filter(p => !p.status || p.status === 'active').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="input-group">
@@ -316,6 +611,35 @@ function App() {
 
       <div className="toast-container">
         {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
+      </div>
+
+      {/* Session Expiry Warning Modal */}
+      <div className={`overlay ${showWarning ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '1rem' }}>Session Expiring Soon</h2>
+          <p style={{ fontSize: '0.9rem', color: 'var(--muted-fg)', marginBottom: '2rem', lineHeight: '1.6' }}>
+            Your session will expire in <strong>1 minute</strong> due to inactivity.
+            <br />
+            Click "Stay Logged In" to continue your session.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button
+              className="action-btn"
+              style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
+              onClick={handleLogout}
+            >
+              Logout Now
+            </button>
+            <button
+              className="action-btn"
+              style={{ flex: 1, background: 'var(--col-primary)' }}
+              onClick={handleStayLoggedIn}
+            >
+              Stay Logged In
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,9 @@
+{
+    "name": "@team-mgmt/shared",
+    "version": "1.0.0",
+    "description": "Shared utilities for team management application",
+    "main": "index.js",
+    "dependencies": {
+        "pg": "^8.11.3"
+    }
+}
