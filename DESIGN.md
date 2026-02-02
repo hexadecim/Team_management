@@ -16,9 +16,9 @@ Used for authentication and authorization.
 
 ### 2.2 Core Schema (Resources & Operations)
 Stores the operational data of the organization.
-- **`core.employees`**: Stores employee details and a denormalized `total_allocation_sum`.
+- **`core.employees`**: Stores employee details, denormalized `total_allocation_sum`, and financial tracking fields: `billable_rate` and `expense_rate`.
 - **`core.projects`**: Project metadata.
-- **`core.allocations`**: Tracks employee-project assignments with percentage and dates.
+- **`core.allocations`**: Tracks employee-project assignments with percentage and dates. This table is the source of truth for all financial and utilization calculations.
 
 ### 2.3 Data Integrity & Automation
 - **`trg_check_allocation_limit`**: A `BEFORE INSERT/UPDATE` trigger on `core.allocations` that sums an employee's current usage. It prevents any record that would exceed 100% total allocation by raising a `data_exception`.
@@ -53,8 +53,7 @@ Responsible for Managing IAM and Core resources.
 
 ### 4.2 Analytics Service
 A high-performance, stateless microservice.
-- **Design Strategy**: Instead of performing heavy `JOIN` and `SUM` operations in JavaScript, it performs a simple `SELECT *` from the `core.dashboard_analytics_summary` Materialized View.
-- **Performance**: Response times are nearly constant (O(1) relative to total data size) because the computation happened asynchronously at the database level.
+- **Design Strategy**: Uses a hybrid approach. Global utilization and bench metrics are fetched from the `core.dashboard_analytics_summary` Materialized View for O(1) retrieval. Lifetime project profitability and burnrates are calculated on-the-fly to support dynamic filtering and "Real-time" what-if scenarios.
 
 ---
 
@@ -69,6 +68,13 @@ The UI dynamically adapts based on the `claims` object inside the decoded JWT:
 - **Tab Visibility**: Tabs like "Administration" are hidden if the user has `none` level access.
 - **Conditional Action Rendering**: "Edit" and "Remove" buttons in the Employee List are conditionally rendered using `canEdit('employee_list')`.
 - **Form Protection**: Validation errors from the backend (like the 100% limit) are bubbled up via a Toast notification system.
+- **Bulk Import Validation**: Implements client-side pre-processing of CSV data to validate project exists, emails are unique, and financial formats are correct before hitting the API.
+
+### 5.3 Financial Analytics Engine
+The system implements a sophisticated client-side analytics engine for project health:
+- **Lifetime Aggregation**: Scans the entire project history to calculate cumulative Income (Billable * Hours) and Expense (Cost * Hours).
+- **Monthly Burnrate Line**: Calculates the current month's overhead by summing expense rates of all active project members.
+- **Margin Visualization**: Uses a **Composed Chart (Bar + Line)** to contrast long-term profitability (bars) against current operational velocity (line).
 
 ---
 
