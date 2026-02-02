@@ -6,6 +6,7 @@ import RoleManager from './components/RoleManager';
 import UserManager from './components/UserManager';
 import ProjectManager from './components/ProjectManager';
 import Logo from './components/Logo';
+import EmployeeManager from './components/EmployeeManager';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 
 const API_BASE = 'http://localhost:4001';
@@ -86,13 +87,8 @@ function App() {
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [allocations, setAllocations] = useState([]);
-  const [search, setSearch] = useState('');
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isAllocPanelOpen, setIsAllocPanelOpen] = useState(false);
-  const [formData, setFormData] = useState(INITIAL_FORM);
   const [allocData, setAllocData] = useState(INITIAL_ALLOCATION_FORM);
-  const [editingId, setEditingId] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = 'info') => {
@@ -160,7 +156,7 @@ function App() {
       fetchProjects();
       fetchAllocations();
     }
-  }, [search, token]);
+  }, [token]);
 
   const canView = (permission) => {
     const perm = claims?.[permission];
@@ -170,8 +166,7 @@ function App() {
 
   const fetchEmployees = async () => {
     try {
-      const url = search ? `${API_BASE}/employees?q=${search}` : `${API_BASE}/employees`;
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}/employees`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setEmployees(await res.json());
@@ -197,21 +192,6 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
-  const handleOpenPanel = (employee = null) => {
-    if (employee) {
-      setEditingId(employee.id);
-      setFormData({
-        ...employee,
-        primarySkills: employee.primarySkills.join(', '),
-        secondarySkills: employee.secondarySkills.join(', ')
-      });
-    } else {
-      setEditingId(null);
-      setFormData(INITIAL_FORM);
-    }
-    setIsPanelOpen(true);
-  };
-
   const handleOpenAllocPanel = (employee = null, monthIdx = 0) => {
     const dates = getMonthDates(monthIdx);
     setAllocData({
@@ -221,101 +201,6 @@ function App() {
       endDate: dates.end
     });
     setIsAllocPanelOpen(true);
-  };
-
-  const handleSubmitEmployee = async (e) => {
-    e.preventDefault();
-    const payload = {
-      ...formData,
-      primarySkills: formData.primarySkills.split(',').map(s => s.trim()).filter(Boolean),
-      secondarySkills: formData.secondarySkills.split(',').map(s => s.trim()).filter(Boolean),
-    };
-    try {
-      const method = editingId ? 'PUT' : 'POST';
-      const url = editingId ? `${API_BASE}/employees/${editingId}` : `${API_BASE}/employees`;
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        addToast(err.error || 'Failed to save employee', 'error');
-        return;
-      }
-      setIsPanelOpen(false);
-      addToast(editingId ? 'Employee updated' : 'Employee created', 'success');
-      fetchEmployees();
-    } catch (err) { addToast('Error saving employee', 'error'); }
-  };
-
-  const handleDeleteEmployee = async () => {
-    if (!deleteConfirm) return;
-    const { id } = deleteConfirm;
-
-    try {
-      const res = await fetch(`${API_BASE}/employees/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        addToast('Employee removed');
-        await fetchEmployees();
-        await fetchAllocations();
-      } else {
-        const err = await res.json();
-        console.error('[App] Delete failed:', err);
-        addToast('Error removing employee', 'error');
-      }
-    } catch (err) {
-      console.error('[App] Error during delete:', err);
-      addToast('Error removing employee', 'error');
-    } finally {
-      setDeleteConfirm(null);
-    }
-  };
-
-  const handleBulkUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const res = await fetch(`${API_BASE}/employees/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        addToast(data.message, 'success');
-        fetchEmployees();
-      } else {
-        if (data.details) {
-          // Validation errors
-          const errorMsg = `Upload failed:\n${data.details.join('\n')}${data.totalErrors > 10 ? `\n...and ${data.totalErrors - 10} more` : ''}`;
-          alert(errorMsg);
-        } else {
-          addToast(data.error || 'Failed to upload employees', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('[Bulk Upload Error]', err);
-      addToast('Error during bulk upload', 'error');
-    } finally {
-      // Clear file input
-      e.target.value = null;
-    }
   };
 
   const handleSubmitAllocation = async (e) => {
@@ -409,7 +294,7 @@ function App() {
         {canView('administration') && <div className={`tab ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Administration</div>}
       </div>
 
-      {view === 'dashboard' && canView('dashboard') && <Dashboard employees={employees} allocations={allocations} />}
+      {view === 'dashboard' && canView('dashboard') && <Dashboard employees={employees} allocations={allocations} projects={projects} />}
 
       {view === 'admin' && canView('administration') && (
         <div className="card">
@@ -457,71 +342,12 @@ function App() {
           </div>
 
           {masterView === 'employees' && canView('employee_list') && (
-            <>
-              <div className="control-bar" style={{ marginBottom: '1rem' }}>
-                <div className="search-field">
-                  <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {canEdit('employee_list') && (
-                    <>
-                      <input
-                        type="file"
-                        accept=".csv, .xlsx, .xls"
-                        id="bulk-upload-input"
-                        style={{ display: 'none' }}
-                        onChange={handleBulkUpload}
-                      />
-                      <button
-                        className="action-btn"
-                        style={{ background: 'var(--card-bg)', color: 'var(--fg)', border: '1px solid var(--border)' }}
-                        onClick={() => document.getElementById('bulk-upload-input').click()}
-                      >
-                        📤 Bulk Upload
-                      </button>
-                      <button className="action-btn" onClick={() => handleOpenPanel()}>+ Add Employee</button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Skills</th>
-                      <th>Project</th>
-                      <th>Allocation</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.map(emp => (
-                      <tr key={emp.id}>
-                        <td><strong>{emp.firstName} {emp.lastName}</strong></td>
-                        <td>
-                          <div className="chip-container">
-                            {emp.primarySkills.map(s => <span key={s} className="chip primary">{s}</span>)}
-                          </div>
-                        </td>
-                        <td><span className="chip project">{emp.projectName || 'Unassigned'}</span></td>
-                        <td><strong>{emp.allocation}%</strong></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {canEdit('employee_list') && (
-                              <>
-                                <button className="action-btn" style={{ padding: '0.4rem 0.8rem' }} onClick={() => handleOpenPanel(emp)}>Edit</button>
-                                <button className="action-btn" style={{ padding: '0.4rem 0.8rem', background: '#ef4444' }} onClick={() => setDeleteConfirm({ id: emp.id, name: `${emp.firstName} ${emp.lastName}` })}>Remove</button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <EmployeeManager
+              token={token}
+              canEdit={canEdit}
+              addToast={addToast}
+              fetchAllocations={fetchAllocations}
+            />
           )}
 
           {masterView === 'projects' && canView('administration') && (
@@ -546,24 +372,18 @@ function App() {
         </div>
       )}
 
-      {/* Employee Panel */}
-      <div className={`overlay ${isPanelOpen ? 'open' : ''}`} onClick={() => setIsPanelOpen(false)}>
-        <div className="slide-over" onClick={e => e.stopPropagation()}>
-          <h2>{editingId ? 'Edit Employee' : 'Add Employee'}</h2>
-          <form onSubmit={handleSubmitEmployee} style={{ marginTop: '2rem' }}>
-            <div className="input-group"><label>First Name</label><input required value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} /></div>
-            <div className="input-group"><label>Last Name</label><input required value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} /></div>
-            <div className="input-group"><label>Skills</label><input value={formData.primarySkills} onChange={e => setFormData({ ...formData, primarySkills: e.target.value })} /></div>
-            <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>Save</button>
-          </form>
-        </div>
+      <div className="toast-container">
+        {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
       </div>
 
       {/* Allocation Panel */}
       <div className={`overlay ${isAllocPanelOpen ? 'open' : ''}`} onClick={() => setIsAllocPanelOpen(false)}>
         <div className="slide-over" onClick={e => e.stopPropagation()}>
-          <h2>Assign Project</h2>
-          <form onSubmit={handleSubmitAllocation} style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <h2 style={{ margin: 0 }}>Assign Project</h2>
+            <button onClick={() => setIsAllocPanelOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
+          </div>
+          <form onSubmit={handleSubmitAllocation}>
             <div className="input-group">
               <label>Employee</label>
               <select value={allocData.employeeId} onChange={e => setAllocData({ ...allocData, employeeId: e.target.value })}>
@@ -580,37 +400,24 @@ function App() {
             </div>
             <div className="input-group">
               <label>Allocation % ({allocData.percentage}%)</label>
-              <input type="range" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} />
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <input type="range" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ flex: 1 }} />
+                <input type="number" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ width: '60px' }} />
+              </div>
             </div>
-            <div className="input-group">
-              <label>Start Month</label>
-              <input type="date" value={allocData.startDate} onChange={e => setAllocData({ ...allocData, startDate: e.target.value })} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="input-group">
+                <label>Start Date</label>
+                <input type="date" value={allocData.startDate} onChange={e => setAllocData({ ...allocData, startDate: e.target.value })} />
+              </div>
+              <div className="input-group">
+                <label>End Date</label>
+                <input type="date" value={allocData.endDate} onChange={e => setAllocData({ ...allocData, endDate: e.target.value })} />
+              </div>
             </div>
-            <div className="input-group">
-              <label>End Month</label>
-              <input type="date" value={allocData.endDate} onChange={e => setAllocData({ ...allocData, endDate: e.target.value })} />
-            </div>
-            <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>Assign</button>
+            <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>Assign Resources</button>
           </form>
         </div>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      <div className={`overlay ${deleteConfirm ? 'open' : ''}`} onClick={() => setDeleteConfirm(null)}>
-        <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', margin: 'auto', textAlign: 'center', padding: '2rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem' }}>Confirm Deletion</h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '2rem' }}>
-            Are you sure, want to delete <strong>{deleteConfirm?.name}</strong>?
-          </p>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="action-btn" style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
-            <button className="action-btn" style={{ flex: 1, background: '#ef4444' }} onClick={handleDeleteEmployee}>Delete</button>
-          </div>
-        </div>
-      </div>
-
-      <div className="toast-container">
-        {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
       </div>
 
       {/* Session Expiry Warning Modal */}

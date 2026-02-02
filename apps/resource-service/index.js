@@ -684,6 +684,10 @@ app.post('/employees/upload', authenticate, upload.single('file'), handleMulterE
         const allEmployees = await employeeRepo.getAll();
         const existingNames = new Set(allEmployees.map(e => `${e.firstName.toLowerCase()} ${e.lastName.toLowerCase()}`));
 
+        // Get existing projects for validation
+        const allProjects = await projectRepo.getAll();
+        const existingProjectNames = new Set(allProjects.map(p => p.name.toLowerCase()));
+
         // Helper to find a value by multiple potential keys (case/space insensitive)
         const getValue = (row, possibleKeys) => {
             const normalizedRow = {};
@@ -704,11 +708,14 @@ app.post('/employees/upload', authenticate, upload.single('file'), handleMulterE
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
+            const lineNum = i + 2; // +1 for 0-indexing, +1 for header row
             const firstName = getValue(row, ['First Name', 'FirstName', 'first_name', 'fname']);
             const lastName = getValue(row, ['Last Name', 'LastName', 'last_name', 'lname']);
+            const email = getValue(row, ['Email', 'E-mail', 'Email Address']);
             const skill = getValue(row, ['Skill', 'Primary Skill', 'Skills', 'primary_skill']);
-
-            const lineNum = i + 2; // +1 for 0-indexing, +1 for header row
+            const projectName = getValue(row, ['Project', 'Current Project', 'Project Name']);
+            const billableRate = getValue(row, ['Billable Rate', 'BillableRate', 'billable_rate']);
+            const expenseRate = getValue(row, ['Expense Rate', 'ExpenseRate', 'expense_rate']);
 
             // 1. Validate required fields
             if (!firstName || !lastName || !skill) {
@@ -716,10 +723,11 @@ app.post('/employees/upload', authenticate, upload.single('file'), handleMulterE
                 continue;
             }
 
-            // 2. Validate junk data (basic check for non-printable chars or weird patterns)
-            const junkPattern = /[^\x20-\x7E]/; // Non-printable ASCII
-            if (junkPattern.test(firstName) || junkPattern.test(lastName) || junkPattern.test(skill)) {
-                errors.push(`Row ${lineNum}: Contains junk data or invalid characters`);
+            // 2. Validate junk data (allow Unicode characters for names and emails)
+            // This pattern blocks only non-printable control characters
+            const junkPattern = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/;
+            if (junkPattern.test(firstName) || junkPattern.test(lastName) || (email && junkPattern.test(email)) || junkPattern.test(skill)) {
+                errors.push(`Row ${lineNum}: Contains invalid control characters`);
                 continue;
             }
 
@@ -734,12 +742,22 @@ app.post('/employees/upload', authenticate, upload.single('file'), handleMulterE
                 continue;
             }
 
+            // 4. Validate Project Name (must exist)
+            if (projectName && !existingProjectNames.has(projectName.toLowerCase())) {
+                errors.push(`Row ${lineNum}: Project "${projectName}" does not exist in project master`);
+                continue;
+            }
+
             seenNames.add(fullName);
             employees.push({
                 firstName,
                 lastName,
+                email,
                 primarySkills: [skill], // Mapping 'Skill' to primarySkills array
                 secondarySkills: [],
+                currentProject: projectName || null,
+                billableRate: parseFloat(billableRate) || 0,
+                expenseRate: parseFloat(expenseRate) || 0,
                 allocation: 0
             });
         }

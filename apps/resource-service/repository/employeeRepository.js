@@ -20,9 +20,12 @@ class EmployeeRepository {
                 e.id, 
                 e.first_name as "firstName", 
                 e.last_name as "lastName", 
+                e.email,
                 e.primary_skills as "primarySkills", 
                 e.secondary_skills as "secondarySkills", 
                 e.current_project as "currentProject",
+                e.billable_rate as "billableRate",
+                e.expense_rate as "expenseRate",
                 COALESCE(
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
@@ -42,7 +45,7 @@ class EmployeeRepository {
             FROM core.employees e
             LEFT JOIN core.allocations a ON e.id = a.employee_id AND a.end_date >= CURRENT_DATE
             LEFT JOIN core.projects p ON a.project_id = p.id
-            GROUP BY e.id, e.first_name, e.last_name, e.primary_skills, e.secondary_skills, e.current_project, e.total_allocation_sum
+            GROUP BY e.id, e.first_name, e.last_name, e.email, e.primary_skills, e.secondary_skills, e.current_project, e.billable_rate, e.expense_rate, e.total_allocation_sum
             ORDER BY e.last_name, e.first_name
         `);
         return result.rows;
@@ -59,9 +62,12 @@ class EmployeeRepository {
                 e.id, 
                 e.first_name as "firstName", 
                 e.last_name as "lastName", 
+                e.email,
                 e.primary_skills as "primarySkills", 
                 e.secondary_skills as "secondarySkills", 
                 e.current_project as "currentProject",
+                e.billable_rate as "billableRate",
+                e.expense_rate as "expenseRate",
                 COALESCE(
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
@@ -82,7 +88,7 @@ class EmployeeRepository {
             LEFT JOIN core.allocations a ON e.id = a.employee_id AND a.end_date >= CURRENT_DATE
             LEFT JOIN core.projects p ON a.project_id = p.id
             WHERE e.id = $1
-            GROUP BY e.id, e.first_name, e.last_name, e.primary_skills, e.secondary_skills, e.current_project, e.total_allocation_sum
+            GROUP BY e.id, e.first_name, e.last_name, e.email, e.primary_skills, e.secondary_skills, e.current_project, e.billable_rate, e.expense_rate, e.total_allocation_sum
         `, [id]);
         return result.rows[0] || null;
     }
@@ -95,22 +101,28 @@ class EmployeeRepository {
     async create(data) {
         const result = await db.queryCore(`
             INSERT INTO core.employees 
-                (first_name, last_name, primary_skills, secondary_skills, current_project, total_allocation_sum)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (first_name, last_name, email, primary_skills, secondary_skills, current_project, billable_rate, expense_rate, total_allocation_sum)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING 
                 id, 
                 first_name as "firstName", 
                 last_name as "lastName", 
+                email,
                 primary_skills as "primarySkills", 
                 secondary_skills as "secondarySkills", 
                 current_project as "currentProject",
+                billable_rate as "billableRate",
+                expense_rate as "expenseRate",
                 total_allocation_sum as "allocation"
         `, [
             data.firstName,
             data.lastName,
+            data.email || null,
             Array.isArray(data.primarySkills) ? data.primarySkills : [],
             Array.isArray(data.secondarySkills) ? data.secondarySkills : [],
             data.currentProject || data.projectName || null,
+            parseFloat(data.billableRate) || 0,
+            parseFloat(data.expenseRate) || 0,
             parseInt(data.allocation) || 0
         ]);
         return result.rows[0];
@@ -131,24 +143,30 @@ class EmployeeRepository {
             SET 
                 first_name = $1,
                 last_name = $2,
-                primary_skills = $3,
-                secondary_skills = $4,
-                current_project = $5
-            WHERE id = $6
+                email = $3,
+                primary_skills = $4,
+                secondary_skills = $5,
+                current_project = $6,
+                billable_rate = $7,
+                expense_rate = $8
+            WHERE id = $9
             RETURNING 
                 id, 
                 first_name as "firstName", 
                 last_name as "lastName", 
+                email,
                 primary_skills as "primarySkills", 
                 secondary_skills as "secondarySkills", 
                 current_project as "currentProject",
+                billable_rate as "billableRate",
+                expense_rate as "expenseRate",
                 COALESCE(
                     ROUND(
                         total_allocation_sum::numeric / 
                         NULLIF(
                             (SELECT COUNT(DISTINCT DATE_TRUNC('month', start_date))
                              FROM core.allocations
-                             WHERE employee_id = $6), 
+                             WHERE employee_id = $9), 
                             0
                         )
                     )::integer,
@@ -157,9 +175,12 @@ class EmployeeRepository {
         `, [
             data.firstName !== undefined ? data.firstName : existing.firstName,
             data.lastName !== undefined ? data.lastName : existing.lastName,
+            data.email !== undefined ? data.email : existing.email,
             data.primarySkills !== undefined ? data.primarySkills : existing.primarySkills,
             data.secondarySkills !== undefined ? data.secondarySkills : existing.secondarySkills,
             data.currentProject !== undefined ? data.currentProject : (data.projectName !== undefined ? data.projectName : existing.currentProject),
+            data.billableRate !== undefined ? parseFloat(data.billableRate) : existing.billableRate,
+            data.expenseRate !== undefined ? parseFloat(data.expenseRate) : existing.expenseRate,
             id
         ]);
         return result.rows[0];
@@ -203,9 +224,12 @@ class EmployeeRepository {
                 e.id, 
                 e.first_name as "firstName", 
                 e.last_name as "lastName", 
+                e.email,
                 e.primary_skills as "primarySkills", 
                 e.secondary_skills as "secondarySkills", 
                 e.current_project as "currentProject",
+                e.billable_rate as "billableRate",
+                e.expense_rate as "expenseRate",
                 COALESCE(
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
@@ -228,6 +252,7 @@ class EmployeeRepository {
             WHERE 
                 LOWER(e.first_name) LIKE $1 OR
                 LOWER(e.last_name) LIKE $1 OR
+                LOWER(e.email) LIKE $1 OR
                 LOWER(e.current_project) LIKE $1 OR
                 EXISTS (
                     SELECT 1 FROM unnest(e.primary_skills) skill 
@@ -237,7 +262,7 @@ class EmployeeRepository {
                     SELECT 1 FROM unnest(e.secondary_skills) skill 
                     WHERE LOWER(skill) LIKE $1
                 )
-            GROUP BY e.id, e.first_name, e.last_name, e.primary_skills, e.secondary_skills, e.current_project, e.total_allocation_sum
+            GROUP BY e.id, e.first_name, e.last_name, e.email, e.primary_skills, e.secondary_skills, e.current_project, e.billable_rate, e.expense_rate, e.total_allocation_sum
             ORDER BY e.last_name, e.first_name
         `, [searchPattern]);
         return result.rows;
