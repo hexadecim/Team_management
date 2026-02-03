@@ -1,24 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, Cell, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine, Label
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell
 } from 'recharts';
 
-const Dashboard = ({ employees, allocations, projects }) => {
+const CapacityDashboard = ({ employees, allocations }) => {
     const [range, setRange] = useState('Quarterly'); // Quarterly, Half-Yearly, Annual
     const [selectedSkill, setSelectedSkill] = useState(null);
     const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 
-    // Professional color palette
     const SKILL_COLORS = [
         '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
         '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#475569'
     ];
-
-    const getUtilizationColor = (utilization) => {
-        if (utilization < 30) return '#ef4444';
-        if (utilization <= 80) return '#f59e0b';
-        return '#10b981';
-    };
 
     const chartData = useMemo(() => {
         return months.map((m, idx) => {
@@ -56,14 +49,13 @@ const Dashboard = ({ employees, allocations, projects }) => {
     }, [chartData, range]);
 
     const analytics = useMemo(() => {
-        const today = new Date('2026-04-01'); // Assume current simulation date is Apr 1st 2026
+        const today = new Date('2026-04-01');
         const thirtyDaysFromNow = new Date(today);
         thirtyDaysFromNow.setDate(today.getDate() + 30);
 
         const currentMonthStart = new Date(2026, 3, 1);
         const currentMonthEnd = new Date(2026, 4, 0);
 
-        // 1. Bench Analytics (Existing)
         const bench = employees.filter(emp => {
             const empAlloc = allocations.filter(a => {
                 const aStart = new Date(a.startDate);
@@ -74,7 +66,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
             return total === 0;
         });
 
-        // Skill Groups for bench chart
         const skillGroups = {};
         bench.forEach(emp => {
             const primarySkill = emp.primarySkills?.[0] || 'Unspecified';
@@ -86,16 +77,14 @@ const Dashboard = ({ employees, allocations, projects }) => {
         });
         const benchChartData = Object.values(skillGroups).sort((a, b) => b.count - a.count);
 
-        // 2. Planning & Foresight: Upcoming Availability (Next 30 Days)
         const upcomingAvailable = employees.filter(emp => {
-            // Not on bench now, but all allocations end within 30 days
             const currentAllocations = allocations.filter(a => {
                 const aStart = new Date(a.startDate);
                 const aEnd = new Date(a.endDate);
                 return a.employeeId === emp.id && aStart <= currentMonthEnd && aEnd >= currentMonthStart;
             });
 
-            if (currentAllocations.length === 0) return false; // Already on bench
+            if (currentAllocations.length === 0) return false;
 
             const latestEnd = new Date(Math.max(...currentAllocations.map(a => new Date(a.endDate))));
             return latestEnd <= thirtyDaysFromNow;
@@ -105,7 +94,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
             return { ...emp, availableFrom: latestEnd.toISOString().split('T')[0] };
         });
 
-        // 3. Risk Management: Over-allocation
         const overAllocated = employees.map(emp => {
             const currentAlloc = allocations.filter(a => {
                 const aStart = new Date(a.startDate);
@@ -116,7 +104,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
             return { ...emp, totalLoad: total };
         }).filter(emp => emp.totalLoad > 100);
 
-        // 4. Financial Proxy: Billable vs Non-Billable
         const totalCapacity = employees.length * 100;
         const allocatedCapacity = allocations.reduce((sum, a) => {
             const aStart = new Date(a.startDate);
@@ -126,49 +113,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
             }
             return sum;
         }, 0);
-
-        // 5. Project Profitability Analysis (Lifetime)
-        const projectMetrics = projects.map(proj => {
-            const projectAllocations = allocations.filter(a => a.projectId === proj.id);
-
-            let projectIncome = 0;
-            let projectExpense = 0;
-            let projectBurnRate = 0;
-
-            projectAllocations.forEach(a => {
-                const emp = employees.find(e => e.id === a.employeeId);
-                if (emp) {
-                    const start = new Date(a.startDate);
-                    const end = new Date(a.endDate);
-
-                    // Calculate duration in months (inclusive)
-                    const monthDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
-                    const durationMonths = Math.max(0, monthDiff);
-
-                    projectIncome += ((emp.billableRate * a.percentage) / 100) * durationMonths;
-                    const monthlyExpense = (emp.expenseRate * a.percentage) / 100;
-                    projectExpense += monthlyExpense * durationMonths;
-
-                    // Current monthly burn rate (assuming simulation date Apr 2026)
-                    if (start <= currentMonthEnd && end >= currentMonthStart) {
-                        projectBurnRate += monthlyExpense;
-                    }
-                }
-            });
-
-            const profit = projectIncome - projectExpense;
-            const marginPct = projectIncome > 0 ? (profit / projectIncome) * 100 : 0;
-
-            return {
-                id: proj.id,
-                name: proj.name,
-                income: Math.round(projectIncome),
-                expense: Math.round(projectExpense),
-                profit: Math.round(profit),
-                marginPct: Math.round(marginPct),
-                burnRate: Math.round(projectBurnRate)
-            };
-        }).filter(p => p.income > 0 || p.expense > 0).sort((a, b) => b.income - a.income);
 
         const billableVsBench = [
             { name: 'Billable (Allocated)', value: allocatedCapacity, color: '#6366f1' },
@@ -184,8 +128,7 @@ const Dashboard = ({ employees, allocations, projects }) => {
             overAllocated,
             billableVsBench,
             totalCapacity,
-            allocatedCapacity,
-            projectMetrics
+            allocatedCapacity
         };
     }, [employees, allocations, chartData]);
 
@@ -204,7 +147,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
 
     return (
         <div className="dashboard-view">
-            {/* Top Row Metrics */}
             <div className="dashboard-grid">
                 <div className="metric-card">
                     <div className="metric-label">Avg Allocation (Apr)</div>
@@ -238,7 +180,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
                 </div>
             </div>
 
-            {/* Charts Row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="chart-container">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -259,31 +200,10 @@ const Dashboard = ({ employees, allocations, projects }) => {
                         <ResponsiveContainer>
                             <LineChart data={filteredData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                                    unit="%"
-                                />
-                                <Tooltip
-                                    cursor={{ stroke: '#6366f1', strokeWidth: 1 }}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="utilization"
-                                    stroke="#6366f1"
-                                    strokeWidth={3}
-                                    dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }}
-                                    activeDot={{ r: 6, strokeWidth: 0 }}
-                                />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} unit="%" />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }} />
+                                <Line type="monotone" dataKey="utilization" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, strokeWidth: 0 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -313,7 +233,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
                 </div>
             </div>
 
-            {/* Bench & Skill Analysis */}
             <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>Bench Distribution by Skill</h2>
                 {analytics.benchChartData.length === 0 ? (
@@ -322,40 +241,14 @@ const Dashboard = ({ employees, allocations, projects }) => {
                     <>
                         <div style={{ width: '100%', height: 250 }}>
                             <ResponsiveContainer>
-                                <BarChart
-                                    data={analytics.benchChartData}
-                                    onClick={handleBarClick}
-                                >
+                                <BarChart data={analytics.benchChartData} onClick={handleBarClick}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis
-                                        dataKey="skill"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }}
-                                        dy={10}
-                                        interval={0}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                                        allowDecimals={false}
-                                    />
-                                    <Tooltip
-                                        cursor={{ fill: 'rgba(0,0,0,0.02)', cursor: 'pointer' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    />
-                                    <Bar
-                                        dataKey="count"
-                                        radius={[4, 4, 0, 0]}
-                                        barSize={50}
-                                    >
+                                    <XAxis dataKey="skill" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} dy={10} interval={0} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} allowDecimals={false} />
+                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }} />
+                                    <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={50}>
                                         {analytics.benchChartData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-bench-${index}`}
-                                                fill={SKILL_COLORS[index % SKILL_COLORS.length]}
-                                                fillOpacity={selectedSkill === entry.skill ? 1 : 0.7}
-                                            />
+                                            <Cell key={`cell-bench-${index}`} fill={SKILL_COLORS[index % SKILL_COLORS.length]} fillOpacity={selectedSkill === entry.skill ? 1 : 0.7} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -387,71 +280,7 @@ const Dashboard = ({ employees, allocations, projects }) => {
                 )}
             </div>
 
-            {/* Project Profitability Section */}
-            <div className="chart-container" style={{ margin: '1.5rem 0' }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>💰 Project Profitability Analysis (Lifetime)</h2>
-                {analytics.projectMetrics.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No active projects with financial data detected.</p>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 400px', gap: '2rem' }}>
-                        <div style={{ width: '100%', height: 400 }}>
-                            <ResponsiveContainer>
-                                <ComposedChart data={analytics.projectMetrics} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} dy={10} interval={0} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} prefix="$" />
-                                    <Tooltip
-                                        cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    />
-                                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px', fontWeight: 700 }} />
-                                    <Bar dataKey="income" name="Cumulative Income ($)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
-                                    <Bar dataKey="expense" name="Cumulative Expense ($)" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
-                                    <Line type="monotone" dataKey="burnRate" name="Monthly Burnrate ($)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border)', padding: '1.5rem', overflowY: 'auto', maxHeight: '350px' }}>
-                            <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--col-primary)' }}>Lifetime Profitability Summary</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {analytics.projectMetrics.map(metrics => (
-                                    <div key={metrics.id} style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border)', lastChild: { borderBottom: 'none' } }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                            <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>{metrics.name}</span>
-                                            <span className="status-badge" style={{
-                                                background: metrics.marginPct > 30 ? '#dcfce7' : metrics.marginPct > 10 ? '#fef3c7' : '#fee2e2',
-                                                color: metrics.marginPct > 30 ? '#166534' : metrics.marginPct > 10 ? '#92400e' : '#991b1b',
-                                                borderColor: 'transparent'
-                                            }}>
-                                                {metrics.marginPct}% Margin
-                                            </span>
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                                Profit: <strong style={{ color: metrics.profit >= 0 ? 'var(--col-success)' : 'var(--col-danger)' }}>${metrics.profit.toLocaleString()}</strong>
-                                            </div>
-                                            <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right' }}>
-                                                Burn: <strong style={{ color: '#d97706' }}>${metrics.burnRate.toLocaleString()}/mo</strong>
-                                            </div>
-                                        </div>
-                                        <div style={{ width: '100%', height: '4px', background: '#f1f5f9', borderRadius: '10px', marginTop: '0.8rem', overflow: 'hidden' }}>
-                                            <div style={{
-                                                width: `${Math.min(100, Math.max(0, metrics.marginPct))}%`,
-                                                height: '100%',
-                                                background: metrics.marginPct > 30 ? '#10b981' : metrics.marginPct > 10 ? '#f59e0b' : '#ef4444'
-                                            }} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Risk & Foresight Bottom Row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                {/* Risk Management Section */}
                 <div className="chart-container">
                     <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: 'var(--col-danger)' }}>
                         ⚠️ Risk Radar: Over-allocated
@@ -476,7 +305,6 @@ const Dashboard = ({ employees, allocations, projects }) => {
                     )}
                 </div>
 
-                {/* Planning & Foresight Section */}
                 <div className="chart-container">
                     <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: '#f59e0b' }}>
                         🔮 Foresight: Rolling Off Soon
@@ -505,5 +333,4 @@ const Dashboard = ({ employees, allocations, projects }) => {
     );
 };
 
-export default Dashboard;
-
+export default CapacityDashboard;

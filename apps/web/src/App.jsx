@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import AllocationCalendar from './components/AllocationCalendar';
-import Dashboard from './components/Dashboard';
+import CapacityDashboard from './components/CapacityDashboard';
+import ProjectDashboard from './components/ProjectDashboard';
 import RoleManager from './components/RoleManager';
 import UserManager from './components/UserManager';
 import ProjectManager from './components/ProjectManager';
@@ -308,20 +309,28 @@ function App() {
 
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--fg)' }}>
-            {view === 'dashboard' ? 'Analytics Dashboard' :
-              view === 'employees' ? 'Master Record' :
-                view === 'allocation' ? 'Planning Board' :
-                  view === 'admin' ? 'Administration' : 'Resource System'}
+            {view === 'capacity' ? 'Capacity Analysis' :
+              view === 'projects_analysis' ? 'Project Analysis' :
+                view === 'employees' ? 'Resource Management' :
+                  view === 'allocation' ? 'Planning Board' :
+                    view === 'admin' ? 'Administration' : 'Resource Hub'}
           </h1>
-          <p style={{ color: 'var(--sidebar-fg-muted)', fontSize: '0.9375rem', marginTop: '0.25rem' }}>
-            {view === 'dashboard' ? 'Overview of project performance and resource allocations.' :
-              view === 'employees' ? 'Manage employee data and project assignments.' :
-                view === 'allocation' ? 'Visual planning board for resource distribution.' :
-                  view === 'admin' ? 'Configure system settings, users, and roles.' : ''}
+          <p className="page-description">
+            {view === 'capacity' ? 'Analyze resource loading, utilization trends, and availability.' :
+              view === 'projects_analysis' ? 'Monitor project financial performance and profitability.' :
+                view === 'employees' ? 'Manage employee records, skills, and rates.' :
+                  view === 'allocation' ? 'Live project assignments and timeline.' :
+                    view === 'admin' ? 'Configure system settings, users, and roles.' : ''}
           </p>
         </div>
 
-        {view === 'dashboard' && canView('dashboard') && <Dashboard employees={employees} allocations={allocations} projects={projects} />}
+        {view === 'capacity' && canView('capacity_analysis') && (
+          <CapacityDashboard employees={employees} allocations={allocations} />
+        )}
+
+        {view === 'projects_analysis' && canView('project_analysis') && (
+          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} />
+        )}
 
         {view === 'admin' && canView('administration') && (
           <div className="card">

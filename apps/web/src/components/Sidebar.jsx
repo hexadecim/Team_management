@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Logo from './Logo';
 
 const Sidebar = ({
     view,
@@ -9,19 +10,35 @@ const Sidebar = ({
     claims,
     username
 }) => {
+    const [expandedGroups, setExpandedGroups] = useState(['dashboard']); // Default open
+
     const canView = (permission) => {
         const perm = claims?.[permission];
         return perm === 'r' || perm === 'rw';
     };
 
+    const toggleGroup = (groupId) => {
+        setExpandedGroups(prev =>
+            prev.includes(groupId)
+                ? prev.filter(id => id !== groupId)
+                : [...prev, groupId]
+        );
+    };
+
     const menuGroups = [
         {
-            title: 'Analyze',
+            title: 'Reports',
             items: [
                 {
-                    id: 'dashboard', label: 'Dashboard', icon: (
+                    id: 'dashboard',
+                    label: 'Dashboard',
+                    icon: (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    ), permission: 'dashboard'
+                    ),
+                    subItems: [
+                        { id: 'capacity', label: 'Capacity Analysis', icon: '📊', permission: 'capacity_analysis' },
+                        { id: 'projects_analysis', label: 'Project Analysis', icon: '💰', permission: 'project_analysis' },
+                    ]
                 },
             ]
         },
@@ -55,32 +72,62 @@ const Sidebar = ({
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
-                <div style={{ width: '32px', height: '32px', background: 'var(--col-primary)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
-                    R
-                </div>
-                <span className="sidebar-brand">ResourceHub</span>
+                <Logo size={32} />
+                <span className="sidebar-brand">Aganya</span>
             </div>
 
             <nav>
                 {menuGroups.map((group, groupIdx) => {
-                    const visibleItems = group.items.filter(item => canView(item.permission));
+                    const visibleItems = group.items.filter(item =>
+                        item.subItems
+                            ? item.subItems.some(si => canView(si.permission))
+                            : canView(item.permission)
+                    );
                     if (visibleItems.length === 0) return null;
 
                     return (
                         <div key={groupIdx} className="sidebar-section">
                             <h3 className="sidebar-section-title">{group.title}</h3>
                             <div className="sidebar-nav">
-                                {visibleItems.map(item => (
-                                    <div
-                                        key={item.id}
-                                        className={`sidebar-item ${view === item.id ? 'active' : ''}`}
-                                        onClick={() => setView(item.id)}
-                                    >
-                                        <span className="sidebar-item-icon">{item.icon}</span>
-                                        <span>{item.label}</span>
-                                        {item.id === 'allocation' && <span className="badge">LIVE</span>}
-                                    </div>
-                                ))}
+                                {visibleItems.map(item => {
+                                    const isExpanded = expandedGroups.includes(item.id);
+                                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                                    const isActive = view === item.id || (item.subItems && item.subItems.some(si => si.id === view));
+
+                                    return (
+                                        <div key={item.id}>
+                                            <div
+                                                className={`sidebar-item ${isActive && !hasSubItems ? 'active' : ''}`}
+                                                onClick={() => hasSubItems ? toggleGroup(item.id) : setView(item.id)}
+                                            >
+                                                <span className="sidebar-item-icon">{item.icon}</span>
+                                                <span>{item.label}</span>
+                                                {hasSubItems && (
+                                                    <span style={{ marginLeft: 'auto', display: 'flex', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                                    </span>
+                                                )}
+                                                {item.id === 'allocation' && <span className="badge">LIVE</span>}
+                                            </div>
+
+                                            {hasSubItems && isExpanded && (
+                                                <div style={{ marginLeft: '1.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '0.5rem' }}>
+                                                    {item.subItems.filter(si => canView(si.permission)).map(si => (
+                                                        <div
+                                                            key={si.id}
+                                                            className={`sidebar-item ${view === si.id ? 'active' : ''}`}
+                                                            onClick={() => setView(si.id)}
+                                                            style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                                                        >
+                                                            <span className="sidebar-item-icon" style={{ fontSize: '1rem', width: '16px' }}>{si.icon}</span>
+                                                            <span>{si.label}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     );

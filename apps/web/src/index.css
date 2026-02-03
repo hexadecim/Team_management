@@ -143,7 +143,10 @@ body {
   font-weight: 800;
   letter-spacing: -0.01em;
   font-size: 1.25rem;
-  color: var(--sidebar-fg);
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .sidebar-section {

@@ -7,7 +7,8 @@ function RoleManager({ token }) {
     const [newRole, setNewRole] = useState({
         name: '',
         permissions: {
-            dashboard: 'none',
+            capacity_analysis: 'none',
+            project_analysis: 'none',
             employee_list: 'none',
             allocation: 'none',
             administration: 'none'
@@ -52,7 +53,16 @@ function RoleManager({ token }) {
                 body: JSON.stringify({ name: newRole.name, permissions })
             });
             if (res.ok) {
-                setNewRole({ name: '', permissions: { dashboard: 'none', employee_list: 'none', allocation: 'none', administration: 'none' } });
+                setNewRole({
+                    name: '',
+                    permissions: {
+                        capacity_analysis: 'none',
+                        project_analysis: 'none',
+                        employee_list: 'none',
+                        allocation: 'none',
+                        administration: 'none'
+                    }
+                });
                 fetchRoles();
             }
         } catch (err) { console.error(err); }
@@ -101,7 +111,8 @@ function RoleManager({ token }) {
 
     const startEditing = (role) => {
         const fullPerms = {
-            dashboard: 'none',
+            capacity_analysis: 'none',
+            project_analysis: 'none',
             employee_list: 'none',
             allocation: 'none',
             administration: 'none',
@@ -169,9 +180,9 @@ function RoleManager({ token }) {
                                     <label>Role Name</label>
                                     <input value={editingRole.name} onChange={e => setEditingRole({ ...editingRole, name: e.target.value })} required />
                                 </div>
-                                {['dashboard', 'employee_list', 'allocation', 'administration'].map(mod => (
+                                {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
-                                        <label style={{ textTransform: 'capitalize' }}>{mod.replace('_', ' ')} Access</label>
+                                        <label style={{ textTransform: 'capitalize' }}>{mod.replace(/_/g, ' ')} Access</label>
                                         <select value={editingRole.permissions[mod]} onChange={e => handlePermChange(editingRole, setEditingRole, mod, e.target.value)}>
                                             <option value="none">None</option>
                                             <option value="r">Read Only</option>
@@ -193,9 +204,9 @@ function RoleManager({ token }) {
                                     <label>Role Name</label>
                                     <input value={newRole.name} onChange={e => setNewRole({ ...newRole, name: e.target.value })} required />
                                 </div>
-                                {['dashboard', 'employee_list', 'allocation', 'administration'].map(mod => (
+                                {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
-                                        <label style={{ textTransform: 'capitalize' }}>{mod.replace('_', ' ')} Access</label>
+                                        <label style={{ textTransform: 'capitalize' }}>{mod.replace(/_/g, ' ')} Access</label>
                                         <select value={newRole.permissions[mod]} onChange={e => handlePermChange(newRole, setNewRole, mod, e.target.value)}>
                                             <option value="none">None</option>
                                             <option value="r">Read Only</option>
