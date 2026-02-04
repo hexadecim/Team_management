@@ -34,6 +34,8 @@
      primary_skills TEXT[],
      secondary_skills TEXT[],
      current_project VARCHAR(100), -- Denormalized for simplicity or link to project
+     billable_rate DECIMAL DEFAULT 0,
+     expense_rate DECIMAL DEFAULT 0,
      total_allocation_sum INTEGER DEFAULT 0
  );
  

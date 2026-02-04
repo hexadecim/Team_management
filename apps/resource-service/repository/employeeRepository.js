@@ -30,18 +30,7 @@ class EmployeeRepository {
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
                 ) as "projectName",
-                COALESCE(
-                    ROUND(
-                        e.total_allocation_sum::numeric / 
-                        NULLIF(
-                            (SELECT COUNT(DISTINCT DATE_TRUNC('month', start_date))
-                             FROM core.allocations
-                             WHERE employee_id = e.id), 
-                            0
-                        )
-                    )::integer,
-                    e.total_allocation_sum
-                ) as "allocation"
+                e.total_allocation_sum as "allocation"
             FROM core.employees e
             LEFT JOIN core.allocations a ON e.id = a.employee_id AND a.end_date >= CURRENT_DATE
             LEFT JOIN core.projects p ON a.project_id = p.id
@@ -72,18 +61,7 @@ class EmployeeRepository {
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
                 ) as "projectName",
-                COALESCE(
-                    ROUND(
-                        e.total_allocation_sum::numeric / 
-                        NULLIF(
-                            (SELECT COUNT(DISTINCT DATE_TRUNC('month', start_date))
-                             FROM core.allocations
-                             WHERE employee_id = e.id), 
-                            0
-                        )
-                    )::integer,
-                    e.total_allocation_sum
-                ) as "allocation"
+                e.total_allocation_sum as "allocation"
             FROM core.employees e
             LEFT JOIN core.allocations a ON e.id = a.employee_id AND a.end_date >= CURRENT_DATE
             LEFT JOIN core.projects p ON a.project_id = p.id
@@ -160,18 +138,7 @@ class EmployeeRepository {
                 current_project as "currentProject",
                 billable_rate as "billableRate",
                 expense_rate as "expenseRate",
-                COALESCE(
-                    ROUND(
-                        total_allocation_sum::numeric / 
-                        NULLIF(
-                            (SELECT COUNT(DISTINCT DATE_TRUNC('month', start_date))
-                             FROM core.allocations
-                             WHERE employee_id = $9), 
-                            0
-                        )
-                    )::integer,
-                    total_allocation_sum
-                ) as "allocation"
+                total_allocation_sum as "allocation"
         `, [
             data.firstName !== undefined ? data.firstName : existing.firstName,
             data.lastName !== undefined ? data.lastName : existing.lastName,
@@ -234,18 +201,7 @@ class EmployeeRepository {
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     'Unassigned'
                 ) as "projectName",
-                COALESCE(
-                    ROUND(
-                        e.total_allocation_sum::numeric / 
-                        NULLIF(
-                            (SELECT COUNT(DISTINCT DATE_TRUNC('month', start_date))
-                             FROM core.allocations
-                             WHERE employee_id = e.id), 
-                            0
-                        )
-                    )::integer,
-                    e.total_allocation_sum
-                ) as "allocation"
+                e.total_allocation_sum as "allocation"
             FROM core.employees e
             LEFT JOIN core.allocations a ON e.id = a.employee_id AND a.end_date >= CURRENT_DATE
             LEFT JOIN core.projects p ON a.project_id = p.id
