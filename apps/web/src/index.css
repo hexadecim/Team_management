@@ -1,5 +1,13 @@
 :root {
-  /* Bang Wong Palette - Color Blind Safe */
+  /* Sky Blue Palette - Modern & Professional */
+  --sky-50: #F0F9FF;
+  --sky-100: #E0F2FE;
+  --sky-200: #BAE6FD;
+  --sky-600: #0284C7;
+  --sky-900: #0C4A6E;
+  --sky-950: #082F49;
+
+  /* Color Blind Safe (Bang Wong) - Kept for accessibility chips */
   --bw-orange: #E69F00;
   --bw-sky-blue: #56B4E9;
   --bw-bluish-green: #009E73;
@@ -7,58 +15,54 @@
   --bw-blue: #0072B2;
   --bw-vermilion: #D55E00;
   --bw-reddish-purple: #CC79A7;
-  --bw-black: #000000;
 
-  /* Light Theme - Tinted with Sky Blue */
-  --bg: #F0F8FF;
-  /* AliceBlue tint */
-  --fg: #111827;
-  --muted: #E0F2FE;
-  /* Sky 100 */
-  --border: #BAE6FD;
-  /* Sky 200 */
-  /* Sidebar Design Tokens (Dribbble Inspired) */
+  /* Theme Mappings (Light Mode) */
+  --bg: var(--sky-50);
+  --fg: var(--sky-900);
+  --muted: var(--sky-100);
+  --border: var(--sky-200);
+  --card-bg: #FFFFFF;
+
+  /* Sidebar Design Tokens */
   --sidebar-width: 260px;
-  --sidebar-bg: #F4F4F4;
-  --sidebar-fg: #1A1D1F;
-  --sidebar-fg-muted: #6F767E;
-  --sidebar-active-bg: #FFFFFF;
-  --sidebar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --sidebar-bg: #FFFFFF;
+  --sidebar-fg: var(--sky-900);
+  --sidebar-fg-muted: #64748b;
+  --sidebar-active-bg: var(--sky-100);
+  --sidebar-active-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+
+  /* Performance/Visual Tokens */
   --radius-xl: 12px;
   --radius-lg: 8px;
-  /* Typography */
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* Functional Mapping */
-  --col-primary: var(--bw-blue);
+  --col-primary: var(--sky-600);
   --col-success: var(--bw-bluish-green);
   --col-warning: var(--bw-orange);
   --col-danger: var(--bw-vermilion);
-  --col-info: var(--bw-sky-blue);
-  --card-bg: #FFFFFF;
+  --col-info: var(--sky-600);
 }
 
 [data-theme='dark'] {
-  /* Dark Theme - Tinted with Deep Blue/Teal */
-  --bg: #022c22;
-  --fg: #ecfdf5;
-  --muted: #064e3b;
-  --border: #115e59;
-  --card-bg: #064e3b;
+  /* Theme Mappings (Dark Mode) */
+  --bg: var(--sky-950);
+  --fg: var(--sky-50);
+  --muted: #0c4a6e;
+  /* Sky 900 */
+  --border: #075985;
+  /* Sky 800 */
+  --card-bg: #0c4a6e;
 
-  /* Functional Mapping - Adjusted for Contrast */
-  --col-primary: var(--bw-sky-blue);
-  --col-success: var(--bw-bluish-green);
-  --col-warning: var(--bw-yellow);
-  --col-danger: var(--bw-vermilion);
-  --col-info: var(--bw-reddish-purple);
+  --sidebar-bg: #0c4a6e;
+  --sidebar-fg: var(--sky-50);
+  --sidebar-fg-muted: #7dd3fc;
+  /* Sky 300 */
+  --sidebar-active-bg: #075985;
+  --sidebar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
-  /* Dark Mode Sidebar */
-  --sidebar-bg: #042f2e;
-  --sidebar-fg: #ecfdf5;
-  --sidebar-fg-muted: #94a3b8;
-  --sidebar-active-bg: #115e59;
-  --sidebar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --col-primary: #38bdf8;
+  /* Sky 400 */
 }
 
 /* ... existing reset and body styles ... */
@@ -143,7 +147,7 @@ body {
   font-weight: 800;
   letter-spacing: -0.01em;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  background: linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -324,7 +328,7 @@ h1 {
   border: 1px solid var(--border);
   padding: 1.5rem;
   border-radius: 4px;
-  background: var(--bg);
+  background: var(--card-bg);
   transition: border-color 0.2s;
 }
 
