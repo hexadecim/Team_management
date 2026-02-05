@@ -2,13 +2,9 @@
 > web@0.0.0 dev
 > vite
 
+Port 5173 is in use, trying another one...
 
-  VITE v4.5.14  ready in 209 ms
+  VITE v4.5.14  ready in 205 ms
 
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: http://192.168.0.114:5173/
-9:15:19 AM [vite] hmr update /src/components/ProjectDashboard.jsx
-9:32:26 AM [vite] hmr update /src/components/ProjectDashboard.jsx
-9:32:28 AM [vite] hmr update /src/components/ProjectDashboard.jsx
-9:32:28 AM [vite] hmr update /src/components/ProjectDashboard.jsx
-9:39:28 AM [vite] hmr update /src/components/ProjectDashboard.jsx
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: http://192.168.0.114:5174/
