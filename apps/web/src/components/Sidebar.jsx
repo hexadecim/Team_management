@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Logo from './Logo';
 
 const Sidebar = ({
     view,
@@ -27,11 +26,11 @@ const Sidebar = ({
 
     const menuGroups = [
         {
-            title: 'Reports',
+            title: 'Dashboard',
             items: [
                 {
                     id: 'dashboard',
-                    label: 'Dashboard',
+                    label: 'Reports',
                     icon: (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                     ),
@@ -72,7 +71,6 @@ const Sidebar = ({
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
-                <Logo size={32} />
                 <span className="sidebar-brand">Aganya</span>
             </div>
 

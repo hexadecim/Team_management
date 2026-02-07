@@ -3,7 +3,11 @@
 > vite
 
 
-  VITE v4.5.14  ready in 470 ms
+  VITE v4.5.14  ready in 166 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.0.114:5173/
+8:27:07 AM [vite] hmr update /src/components/Sidebar.jsx
+8:27:32 AM [vite] hmr update /src/components/Sidebar.jsx
+8:30:04 AM [vite] hmr update /src/App.jsx
+8:30:20 AM [vite] hmr update /src/App.jsx

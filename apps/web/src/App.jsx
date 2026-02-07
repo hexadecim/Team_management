@@ -242,8 +242,13 @@ function App() {
     return (
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <Logo size={140} />
+          <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--fg)', marginBottom: '0.5rem' }}>
+              Aganya Core
+            </h1>
+            <p style={{ fontSize: '0.95rem', color: 'var(--muted-fg)', fontWeight: 500 }}>
+              The Performance & Efficiency Analyzing Tool
+            </p>
           </div>
           <div className="card">
             <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Sign In</h2>
@@ -276,7 +281,7 @@ function App() {
         setTheme={setTheme}
         handleLogout={handleLogout}
         claims={claims}
-        username="Sanjay Rana"
+        username="System Admin"
       />
 
       <main className="main-content">
@@ -295,7 +300,7 @@ function App() {
             >
               {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
             </button>
-            <div className="status-badge">Sanjay Rana Product</div>
+            <div className="status-badge">System Admin</div>
             <button className="action-btn" onClick={handleLogout} style={{ background: 'var(--col-danger)', color: '#ffffff', padding: '0.4rem 1rem' }}>Logout</button>
           </div>
         </header>
