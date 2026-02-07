@@ -1,0 +1,5 @@
+# Add .env file to gitignore
+.env
+
+# Docker
+docker-compose.override.yml

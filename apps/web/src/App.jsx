@@ -93,6 +93,13 @@ function App() {
   const [allocData, setAllocData] = useState(INITIAL_ALLOCATION_FORM);
   const [toasts, setToasts] = useState([]);
 
+  // Edit/Delete state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedAllocationId, setSelectedAllocationId] = useState(null);
+  const [isAllocationListOpen, setIsAllocationListOpen] = useState(false);
+  const [selectedMonthAllocations, setSelectedMonthAllocations] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+
   const addToast = (message, type = 'info') => {
     const id = Date.now();
     setToasts([...toasts, { id, message, type }]);
@@ -202,7 +209,63 @@ function App() {
       startDate: dates.start,
       endDate: dates.end
     });
+    setIsEditMode(false);
+    setSelectedAllocationId(null);
     setIsAllocPanelOpen(true);
+  };
+
+  const handleShowAllocationList = (employee, monthIdx, monthAllocations) => {
+    setSelectedEmployee(employee);
+    setSelectedMonthAllocations(monthAllocations);
+    setIsAllocationListOpen(true);
+  };
+
+  const handleEditAllocation = (allocation) => {
+    setAllocData({
+      employeeId: allocation.employeeId,
+      projectId: allocation.projectId,
+      percentage: allocation.percentage,
+      startDate: allocation.startDate,
+      endDate: allocation.endDate
+    });
+    setIsEditMode(true);
+    setSelectedAllocationId(allocation.id);
+    setIsAllocationListOpen(false);
+    setIsAllocPanelOpen(true);
+  };
+
+  const handleDeleteAllocation = async (allocationId) => {
+    if (!window.confirm('Are you sure you want to delete this allocation?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/allocations/${allocationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        addToast('Failed to delete allocation', 'error');
+        return;
+      }
+
+      addToast('Allocation deleted successfully', 'success');
+      fetchAllocations();
+      fetchEmployees();
+
+      // Close the list modal if no more allocations
+      const remainingAllocations = selectedMonthAllocations.filter(a => a.id !== allocationId);
+      if (remainingAllocations.length === 0) {
+        setIsAllocationListOpen(false);
+      } else {
+        setSelectedMonthAllocations(remainingAllocations);
+      }
+    } catch (err) {
+      addToast('Error deleting allocation', 'error');
+    }
   };
 
   const handleSubmitAllocation = async (e) => {
@@ -211,8 +274,14 @@ function App() {
     const payload = { ...allocData, projectName: project ? project.name : '' };
 
     try {
-      const res = await fetch(`${API_BASE}/allocations`, {
-        method: 'POST',
+      const url = isEditMode
+        ? `${API_BASE}/allocations/${selectedAllocationId}`
+        : `${API_BASE}/allocations`;
+
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -227,15 +296,19 @@ function App() {
       }
 
       if (!res.ok) {
-        addToast('Failed to create allocation', 'error');
+        addToast(`Failed to ${isEditMode ? 'update' : 'create'} allocation`, 'error');
         return;
       }
 
       setIsAllocPanelOpen(false);
-      addToast('Allocation successful', 'success');
+      setIsEditMode(false);
+      setSelectedAllocationId(null);
+      addToast(`Allocation ${isEditMode ? 'updated' : 'created'} successfully`, 'success');
       fetchAllocations();
       fetchEmployees(); // Sum changed
-    } catch (err) { addToast('Error creating allocation', 'error'); }
+    } catch (err) {
+      addToast(`Error ${isEditMode ? 'updating' : 'creating'} allocation`, 'error');
+    }
   };
 
   if (!token) {
@@ -409,6 +482,7 @@ function App() {
               allocations={allocations}
               projects={projects}
               onAddAllocation={canEdit('allocation') ? handleOpenAllocPanel : undefined}
+              onShowAllocationList={canView('allocation') ? handleShowAllocationList : undefined}
             />
           </div>
         )}
@@ -421,7 +495,7 @@ function App() {
         <div className={`overlay ${isAllocPanelOpen ? 'open' : ''}`} onClick={() => setIsAllocPanelOpen(false)}>
           <div className="slide-over" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ margin: 0 }}>Assign Project</h2>
+              <h2 style={{ margin: 0 }}>{isEditMode ? 'Edit Allocation' : 'Assign Project'}</h2>
               <button onClick={() => setIsAllocPanelOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
             </div>
             <form onSubmit={handleSubmitAllocation}>
@@ -456,8 +530,83 @@ function App() {
                   <input type="date" value={allocData.endDate} onChange={e => setAllocData({ ...allocData, endDate: e.target.value })} />
                 </div>
               </div>
-              <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>Assign Resources</button>
+              <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>
+                {isEditMode ? 'Update Allocation' : 'Assign Resources'}
+              </button>
             </form>
+          </div>
+        </div>
+
+        {/* Allocation List Modal */}
+        <div className={`overlay ${isAllocationListOpen ? 'open' : ''}`} onClick={() => setIsAllocationListOpen(false)}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', margin: 'auto', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0 }}>
+                {selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}'s Allocations` : 'Allocations'}
+              </h2>
+              <button onClick={() => setIsAllocationListOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
+            </div>
+
+            {selectedMonthAllocations.length === 0 ? (
+              <p style={{ color: 'var(--muted-fg)', textAlign: 'center', padding: '2rem' }}>No allocations found.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {selectedMonthAllocations.map(allocation => {
+                  const project = projects.find(p => p.id === allocation.projectId);
+                  return (
+                    <div key={allocation.id} className="allocation-item" style={{
+                      padding: '1rem',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'var(--card-bg)'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                          {project ? project.name : 'Unknown Project'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)' }}>
+                          {allocation.percentage}% • {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {canEdit('allocation') && (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleEditAllocation(allocation)}
+                            className="action-btn"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAllocation(allocation.id)}
+                            className="action-btn"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--col-danger)', color: 'white' }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {canEdit('allocation') && (
+              <button
+                onClick={() => {
+                  setIsAllocationListOpen(false);
+                  handleOpenAllocPanel(selectedEmployee, 0);
+                }}
+                className="action-btn"
+                style={{ width: '100%', marginTop: '1.5rem' }}
+              >
+                + Add New Allocation
+              </button>
+            )}
           </div>
         </div>
 

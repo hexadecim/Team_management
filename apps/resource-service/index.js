@@ -909,7 +909,7 @@ app.get('/analytics/project-deviations', authenticate, checkPermission('dashboar
 // ALLOCATION ENDPOINTS
 // ============================================
 
-app.get('/allocations', async (req, res) => {
+app.get('/allocations', authenticate, checkPermission('allocation', 'r'), async (req, res) => {
     try {
         const allocations = await allocationRepo.getAll();
         res.send(allocations);
@@ -919,9 +919,21 @@ app.get('/allocations', async (req, res) => {
     }
 });
 
-app.post('/allocations', async (req, res) => {
+app.post('/allocations', authenticate, checkPermission('allocation', 'rw'), async (req, res) => {
     try {
         const allocation = await allocationRepo.create(req.body);
+
+        // Audit log the creation
+        await AuditLogger.logAuth(req.user.username, 'ALLOCATION_CREATED', true, {
+            allocationId: allocation.id,
+            employeeId: allocation.employeeId,
+            projectId: allocation.projectId,
+            projectName: allocation.projectName,
+            percentage: allocation.percentage,
+            startDate: allocation.startDate,
+            endDate: allocation.endDate
+        });
+
         res.status(201).send(allocation);
     } catch (error) {
         if (error.message.includes('Total allocation cannot exceed 100%')) {
@@ -932,10 +944,36 @@ app.post('/allocations', async (req, res) => {
     }
 });
 
-app.put('/allocations/:id', async (req, res) => {
+app.put('/allocations/:id', authenticate, checkPermission('allocation', 'rw'), async (req, res) => {
     try {
+        // Fetch old allocation data for audit log
+        const oldAllocation = await allocationRepo.getById(req.params.id);
+        if (!oldAllocation) return res.status(404).send({ error: 'Not found' });
+
         const allocation = await allocationRepo.update(req.params.id, req.body);
-        if (!allocation) return res.status(404).send({ error: 'Not found' });
+
+        // Audit log the update with before/after comparison
+        await AuditLogger.logAuth(req.user.username, 'ALLOCATION_UPDATED', true, {
+            allocationId: req.params.id,
+            oldData: {
+                employeeId: oldAllocation.employeeId,
+                projectId: oldAllocation.projectId,
+                projectName: oldAllocation.projectName,
+                percentage: oldAllocation.percentage,
+                startDate: oldAllocation.startDate,
+                endDate: oldAllocation.endDate
+            },
+            newData: {
+                employeeId: allocation.employeeId,
+                projectId: allocation.projectId,
+                projectName: allocation.projectName,
+                percentage: allocation.percentage,
+                startDate: allocation.startDate,
+                endDate: allocation.endDate
+            },
+            changes: req.body
+        });
+
         res.send(allocation);
     } catch (error) {
         if (error.message.includes('Total allocation cannot exceed 100%')) {
@@ -946,10 +984,25 @@ app.put('/allocations/:id', async (req, res) => {
     }
 });
 
-app.delete('/allocations/:id', async (req, res) => {
+app.delete('/allocations/:id', authenticate, checkPermission('allocation', 'rw'), async (req, res) => {
     try {
+        // Fetch allocation data before deletion for audit log
+        const allocation = await allocationRepo.getById(req.params.id);
+        if (!allocation) return res.status(404).send({ error: 'Not found' });
+
         const deleted = await allocationRepo.delete(req.params.id);
-        if (!deleted) return res.status(404).send({ error: 'Not found' });
+
+        // Audit log the deletion
+        await AuditLogger.logAuth(req.user.username, 'ALLOCATION_DELETED', true, {
+            allocationId: req.params.id,
+            employeeId: allocation.employeeId,
+            projectId: allocation.projectId,
+            projectName: allocation.projectName,
+            percentage: allocation.percentage,
+            startDate: allocation.startDate,
+            endDate: allocation.endDate
+        });
+
         res.status(204).send();
     } catch (error) {
         console.error('[Delete Allocation Error]', error);

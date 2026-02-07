@@ -56,6 +56,29 @@ class AllocationRepository {
     }
 
     /**
+     * Get allocation by ID
+     * @param {string} id - Allocation ID (UUID)
+     * @returns {Promise<Object|null>} Allocation object or null if not found
+     */
+    async getById(id) {
+        const result = await db.queryCore(`
+            SELECT 
+                a.id,
+                a.employee_id as "employeeId",
+                a.project_id as "projectId",
+                p.name as "projectName",
+                a.percentage,
+                a.start_date as "startDate",
+                a.end_date as "endDate",
+                a.month_year as "monthYear"
+            FROM core.allocations a
+            LEFT JOIN core.projects p ON a.project_id = p.id
+            WHERE a.id = $1
+        `, [id]);
+        return result.rows[0] || null;
+    }
+
+    /**
      * Create a new allocation
      * @param {Object} data - Allocation data
      * @returns {Promise<Object>} Created allocation object

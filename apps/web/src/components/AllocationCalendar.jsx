@@ -1,6 +1,6 @@
 import React from 'react';
 
-const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation }) => {
+const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation, onShowAllocationList }) => {
     const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 
     const getHeatClass = (percentage) => {
@@ -31,6 +31,14 @@ const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation 
         });
     };
 
+    const getTooltipText = (monthAllocations) => {
+        return monthAllocations.map(allocation => {
+            const project = projects.find(p => p.id === allocation.projectId);
+            const projectName = project ? project.name : 'Unknown Project';
+            return `${projectName} (${allocation.percentage}%)`;
+        }).join(', ');
+    };
+
     return (
         <div className="calendar-view">
             <div className="calendar-header" style={{ gridTemplateColumns: '200px repeat(12, 1fr)' }}>
@@ -53,11 +61,20 @@ const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation 
                             <div
                                 key={idx}
                                 className="day-cell"
-                                onClick={() => onAddAllocation(emp, idx)}
+                                onClick={() => {
+                                    if (totalOnMonth > 0) {
+                                        onShowAllocationList(emp, idx, monthAllocations);
+                                    } else {
+                                        onAddAllocation(emp, idx);
+                                    }
+                                }}
                                 style={{ cursor: 'pointer' }}
                             >
                                 {totalOnMonth > 0 && (
-                                    <div className={`allocation-bar ${getHeatClass(totalOnMonth)}`}>
+                                    <div
+                                        className={`allocation-bar ${getHeatClass(totalOnMonth)}`}
+                                        title={getTooltipText(monthAllocations)}
+                                    >
                                         {totalOnMonth}%
                                     </div>
                                 )}
