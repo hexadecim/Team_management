@@ -473,7 +473,7 @@ app.post('/auth/logout', authenticate, async (req, res) => {
 // ROLE & USER MANAGEMENT ENDPOINTS
 // ============================================
 
-app.get('/roles', async (req, res) => {
+app.get('/roles', authenticate, async (req, res) => {
     try {
         const roles = await roleRepo.getAll();
         res.send(roles);
@@ -483,7 +483,7 @@ app.get('/roles', async (req, res) => {
     }
 });
 
-app.post('/roles', async (req, res) => {
+app.post('/roles', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
         const role = await roleRepo.create(req.body);
         res.status(201).send(role);
@@ -492,7 +492,7 @@ app.post('/roles', async (req, res) => {
     }
 });
 
-app.put('/roles/:id', async (req, res) => {
+app.put('/roles/:id', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
         const role = await roleRepo.update(req.params.id, req.body);
         if (!role) return res.status(404).send({ error: 'Role not found' });
@@ -502,7 +502,7 @@ app.put('/roles/:id', async (req, res) => {
     }
 });
 
-app.delete('/roles/:id', async (req, res) => {
+app.delete('/roles/:id', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
         const deleted = await roleRepo.delete(req.params.id);
         if (!deleted) return res.status(404).send({ error: 'Role not found' });
@@ -513,7 +513,7 @@ app.delete('/roles/:id', async (req, res) => {
     }
 });
 
-app.get('/users', async (req, res) => {
+app.get('/users', authenticate, checkPermission('administration', 'r'), async (req, res) => {
     try {
         const users = await userRepo.getAll();
         res.send(users);
@@ -524,11 +524,12 @@ app.get('/users', async (req, res) => {
 });
 
 app.post('/users',
+    authenticate,
+    checkPermission('administration', 'rw'),
     [
         body('username').trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
         body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-        body('project_ids').optional().isArray().withMessage('project_ids must be an array'),
-        body('assigned_project_id').optional()
+        body('assigned_project_id').notEmpty().withMessage('Project assignment is mandatory')
     ],
     async (req, res) => {
         const errors = validationResult(req);
@@ -543,7 +544,7 @@ app.post('/users',
                 username: req.body.username,
                 password: hashedPassword,
                 roles: req.body.roles || [],
-                project_ids: req.body.project_ids || (req.body.assigned_project_id ? [req.body.assigned_project_id] : [])
+                assigned_project_id: req.body.assigned_project_id
             };
 
             const user = await userRepo.create(userData);
@@ -558,7 +559,7 @@ app.post('/users',
     }
 );
 
-app.put('/users/:username/roles', async (req, res) => {
+app.put('/users/:username/roles', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
         const user = await userRepo.updateRoles(req.params.username, req.body.roles);
         if (!user) return res.status(404).send({ error: 'User not found' });
@@ -580,7 +581,7 @@ app.put('/users/:username/projects', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/users/:username', async (req, res) => {
+app.delete('/users/:username', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
         const deleted = await userRepo.delete(req.params.username);
         if (!deleted) return res.status(404).send({ error: 'User not found' });

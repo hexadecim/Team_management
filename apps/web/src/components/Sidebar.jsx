@@ -71,7 +71,7 @@ const Sidebar = ({
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
-                <span className="sidebar-brand">Aganya</span>
+                <span className="sidebar-brand">Aganya Core</span>
             </div>
 
             <nav>

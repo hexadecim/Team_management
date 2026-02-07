@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const API_BASE = 'http://localhost:4001';
 
-function UserManager({ token }) {
+function UserManager({ token, addToast }) {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -66,9 +66,10 @@ function UserManager({ token }) {
             if (res.ok) {
                 setNewUser({ username: '', password: '', roles: [], project_ids: [] });
                 fetchUsers();
+                addToast('User created successfully', 'success');
             } else {
                 const error = await res.json();
-                alert(error.error || error.errors?.[0]?.msg || 'Failed to create user');
+                addToast(error.error || error.errors?.[0]?.msg || 'Failed to create user', 'error');
             }
         } catch (err) { console.error(err); }
     };
@@ -129,7 +130,7 @@ function UserManager({ token }) {
 
     const handleDeleteUser = async (username) => {
         if (username === 'admin') {
-            alert("Cannot delete primary admin account");
+            addToast("Cannot delete primary admin account", 'error');
             return;
         }
         if (!window.confirm(`Are you sure you want to delete user ${username}?`)) return;
@@ -140,9 +141,16 @@ function UserManager({ token }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
+                addToast('User deleted successfully', 'success');
                 fetchUsers();
+            } else {
+                const error = await res.json();
+                addToast(error.error || 'Failed to delete user', 'error');
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            addToast('Error deleting user', 'error');
+        }
     };
 
     const handleToggleEditingRole = (roleName) => {

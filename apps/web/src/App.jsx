@@ -429,8 +429,8 @@ function App() {
               </div>
             </div>
 
-            {adminView === 'users' && <UserManager token={token} />}
-            {adminView === 'roles' && <RoleManager token={token} />}
+            {adminView === 'users' && <UserManager token={token} addToast={addToast} />}
+            {adminView === 'roles' && <RoleManager token={token} addToast={addToast} />}
           </div>
         )}
 

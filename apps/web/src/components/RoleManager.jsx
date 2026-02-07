@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const API_BASE = 'http://localhost:4001';
 
-function RoleManager({ token }) {
+function RoleManager({ token, addToast }) {
     const [roles, setRoles] = useState([]);
     const [newRole, setNewRole] = useState({
         name: '',
@@ -64,8 +64,15 @@ function RoleManager({ token }) {
                     }
                 });
                 fetchRoles();
+                addToast('Role created successfully', 'success');
+            } else {
+                const error = await res.json();
+                addToast(error.error || 'Failed to create role', 'error');
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            addToast('Error creating role', 'error');
+        }
     };
 
     const handleUpdateRole = async (e) => {
@@ -87,13 +94,20 @@ function RoleManager({ token }) {
             if (res.ok) {
                 setEditingRole(null);
                 fetchRoles();
+                addToast('Role updated successfully', 'success');
+            } else {
+                const error = await res.json();
+                addToast(error.error || 'Failed to update role', 'error');
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            addToast('Error updating role', 'error');
+        }
     };
 
     const handleDeleteRole = async (id, name) => {
         if (name === 'Admin') {
-            alert("Cannot delete primary Admin role");
+            addToast("Cannot delete primary Admin role", 'error');
             return;
         }
         if (!window.confirm(`Are you sure you want to delete the "${name}" role? This might affect users assigned to this role.`)) return;
@@ -104,9 +118,16 @@ function RoleManager({ token }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
+                addToast('Role deleted successfully', 'success');
                 fetchRoles();
+            } else {
+                const error = await res.json();
+                addToast(error.error || 'Failed to delete role', 'error');
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            addToast('Error deleting role', 'error');
+        }
     };
 
     const startEditing = (role) => {
