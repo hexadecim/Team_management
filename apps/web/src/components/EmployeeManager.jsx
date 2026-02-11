@@ -14,41 +14,25 @@ const INITIAL_FORM = {
     allocation: 0
 };
 
-function EmployeeManager({ token, canEdit, addToast, fetchAllocations }) {
-    const [employees, setEmployees] = useState([]);
-    const [projects, setProjects] = useState([]);
+function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees: allEmployees, projects, onRefresh }) {
     const [search, setSearch] = useState('');
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [formData, setFormData] = useState(INITIAL_FORM);
     const [editingId, setEditingId] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-    useEffect(() => {
-        if (token) {
-            fetchEmployees();
-            fetchProjects();
-        }
-    }, [search, token]);
-
-    const fetchEmployees = async () => {
-        try {
-            const url = search ? `${API_BASE}/employees?q=${search}` : `${API_BASE}/employees`;
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) setEmployees(await res.json());
-            else console.error('Fetch employees failed:', res.status);
-        } catch (err) { console.error(err); }
-    };
-
-    const fetchProjects = async () => {
-        try {
-            const res = await fetch(`${API_BASE}/projects`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) setProjects(await res.json());
-        } catch (err) { console.error(err); }
-    };
+    // Filter employees based on search
+    const employees = allEmployees.filter(emp => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+            emp.firstName.toLowerCase().includes(q) ||
+            emp.lastName.toLowerCase().includes(q) ||
+            (emp.email && emp.email.toLowerCase().includes(q)) ||
+            (emp.primarySkills && emp.primarySkills.some(s => s.toLowerCase().includes(q))) ||
+            (emp.projectName && emp.projectName.toLowerCase().includes(q))
+        );
+    });
 
     const handleOpenPanel = (employee = null) => {
         if (employee) {
@@ -94,7 +78,7 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations }) {
             }
             setIsPanelOpen(false);
             addToast(editingId ? 'Employee updated' : 'Employee created', 'success');
-            fetchEmployees();
+            if (onRefresh) onRefresh();
         } catch (err) { addToast('Error saving employee', 'error'); }
     };
 
@@ -110,7 +94,7 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations }) {
 
             if (res.ok) {
                 addToast('Employee removed');
-                await fetchEmployees();
+                if (onRefresh) await onRefresh();
                 if (fetchAllocations) await fetchAllocations();
             } else {
                 const err = await res.json();
@@ -143,7 +127,7 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations }) {
 
             if (res.ok) {
                 addToast(data.message, 'success');
-                fetchEmployees();
+                if (onRefresh) onRefresh();
             } else {
                 if (data.details) {
                     const errorMsg = `Upload failed:\n${data.details.join('\n')}${data.totalErrors > 10 ? `\n...and ${data.totalErrors - 10} more` : ''}`;

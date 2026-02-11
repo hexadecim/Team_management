@@ -6,6 +6,8 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
     const [projectName, setProjectName] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [plannedBudget, setPlannedBudget] = useState('');
+    const [averageWorkingHours, setAverageWorkingHours] = useState('160');
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
     const [editModal, setEditModal] = useState(null); // { id, name, currentEndDate }
     const [newEndDate, setNewEndDate] = useState('');
@@ -26,6 +28,14 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
             return;
         }
 
+        const payload = {
+            name: projectName,
+            ...(startDate && { start_date: startDate }),
+            ...(endDate && { end_date: endDate }),
+            ...(plannedBudget && { planned_budget: parseFloat(plannedBudget) }),
+            average_working_hours: parseInt(averageWorkingHours) || 160
+        };
+
         try {
             const res = await fetch(`${API_BASE}/projects`, {
                 method: 'POST',
@@ -33,11 +43,7 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    name: projectName,
-                    ...(startDate && { start_date: startDate }),
-                    ...(endDate && { end_date: endDate })
-                })
+                body: JSON.stringify(payload)
             });
 
             if (res.ok) {
@@ -45,6 +51,8 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
                 setProjectName('');
                 setStartDate('');
                 setEndDate('');
+                setPlannedBudget('');
+                setAverageWorkingHours('160');
                 onProjectCreated();
             } else {
                 const err = await res.json();
@@ -160,92 +168,155 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
 
     return (
         <div>
-            <div className="control-bar" style={{ marginBottom: '2rem' }}>
-                <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', width: '100%', flexWrap: 'wrap' }}>
-                    <div className="input-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
-                        <input
-                            required
-                            type="text"
-                            placeholder="Project Name..."
-                            value={projectName}
-                            onChange={e => setProjectName(e.target.value)}
-                        />
+            <div className="card" style={{ marginBottom: '2.5rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'white', padding: '2rem' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--col-primary)', margin: 0 }}>
+                        🏗️ New Project Initiation
+                    </h2>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.4rem', fontWeight: 600 }}>
+                        Define project parameters and financial baselines to start tracking performance.
+                    </p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ color: '#475569', fontWeight: 800 }}>Project Identity</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="Enter project name..."
+                                value={projectName}
+                                onChange={e => setProjectName(e.target.value)}
+                                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.8rem 1rem' }}
+                            />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ color: '#475569', fontWeight: 800 }}>Start Date</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.8rem 1rem' }}
+                            />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ color: '#475569', fontWeight: 800 }}>End Date</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.8rem 1rem' }}
+                            />
+                        </div>
                     </div>
-                    <div className="input-group" style={{ flex: '1', minWidth: '150px', marginBottom: 0 }}>
-                        <input
-                            type="date"
-                            placeholder="Start Date (Optional)"
-                            value={startDate}
-                            onChange={e => setStartDate(e.target.value)}
-                        />
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', alignItems: 'flex-end' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ color: '#475569', fontWeight: 800 }}>Investment Budget ($)</label>
+                            <input
+                                type="number"
+                                placeholder="0.00"
+                                value={plannedBudget}
+                                onChange={e => setPlannedBudget(e.target.value)}
+                                min="0"
+                                step="0.01"
+                                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.8rem 1rem' }}
+                            />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ color: '#475569', fontWeight: 800 }}>Monthly Utilization (Hrs)</label>
+                            <input
+                                type="number"
+                                placeholder="160"
+                                value={averageWorkingHours}
+                                onChange={e => setAverageWorkingHours(e.target.value)}
+                                min="1"
+                                step="1"
+                                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.8rem 1rem' }}
+                            />
+                        </div>
+                        <button type="submit" className="action-btn" style={{ height: '48px', margin: 0, borderRadius: '8px', background: 'var(--col-primary)', color: 'white', fontWeight: 900 }}>
+                            🚀 Initialize Project
+                        </button>
                     </div>
-                    <div className="input-group" style={{ flex: '1', minWidth: '150px', marginBottom: 0 }}>
-                        <input
-                            type="date"
-                            placeholder="End Date (Optional)"
-                            value={endDate}
-                            onChange={e => setEndDate(e.target.value)}
-                        />
-                    </div>
-                    <button type="submit" className="action-btn">+ Create Project</button>
                 </form>
             </div>
 
-            <div className="card">
-                <h3>Project Inventory</h3>
-                <div style={{ marginTop: '1rem', overflowX: 'auto' }}>
-                    <table style={{ width: '100%' }}>
+            <div className="card" style={{ padding: '0', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569' }}>
+                        📁 Project Inventory
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', background: '#e2e8f0', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+                        {projects.length} TOTAL
+                    </span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="modern-table">
                         <thead>
                             <tr>
                                 <th>Project Name</th>
                                 <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Deviation</th>
-                                <th style={{ textAlign: 'right' }}>Actions</th>
+                                <th className="nowrap">End Date</th>
+                                <th className="text-center">Deviation</th>
+                                <th className="text-right">Budget ($)</th>
+                                <th className="text-center">Hours/Mo</th>
+                                <th className="text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {projects.map(p => {
-                                const deviation = calculateDeviation(p.end_date, p.original_end_date);
+                                const dev = calculateDeviation(p.end_date, p.original_end_date);
                                 return (
                                     <tr key={p.id}>
-                                        <td><strong>{p.name}</strong></td>
-                                        <td>{formatDate(p.start_date)}</td>
-                                        <td>{formatDate(p.end_date)}</td>
-                                        <td>
-                                            {deviation && (
-                                                <span className="chip" style={{
-                                                    background: deviation.startsWith('+') ? 'var(--col-warning)' : 'var(--col-success)',
-                                                    fontSize: '0.75rem'
-                                                }}>
-                                                    {deviation}
-                                                </span>
-                                            )}
+                                        <td style={{ fontWeight: 700, color: 'var(--col-primary)' }}>{p.name}</td>
+                                        <td className="nowrap">{formatDate(p.start_date)}</td>
+                                        <td className="nowrap">{formatDate(p.end_date)}</td>
+                                        <td className="text-center">
+                                            {(() => {
+                                                if (!dev) return <span style={{ opacity: 0.3 }}>-</span>;
+                                                const isPositive = dev.startsWith('+');
+                                                return (
+                                                    <span style={{
+                                                        color: isPositive ? '#ef4444' : '#10b981',
+                                                        fontWeight: 800,
+                                                        fontSize: '0.75rem',
+                                                        background: isPositive ? '#fee2e2' : '#dcfce7',
+                                                        padding: '0.2rem 0.4rem',
+                                                        borderRadius: '4px'
+                                                    }}>
+                                                        {dev}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
-                                        <td style={{ textAlign: 'right' }}>
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                {p.end_date && (
-                                                    <button
-                                                        className="action-btn"
-                                                        onClick={() => handleEditClick(p)}
-                                                        style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', background: 'var(--col-info)' }}
-                                                    >
-                                                        Edit Date
-                                                    </button>
-                                                )}
+                                        <td className="text-right" style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                                            {p.planned_budget ? `$${parseFloat(p.planned_budget).toLocaleString()}` : <span style={{ opacity: 0.3 }}>-</span>}
+                                        </td>
+                                        <td className="text-center" style={{ fontWeight: 600 }}>{p.average_working_hours || '160'}</td>
+                                        <td className="text-right">
+                                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                                                 <button
-                                                    className="action-btn"
+                                                    className="action-chip history"
                                                     onClick={() => handleHistoryClick(p)}
-                                                    style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', background: 'var(--muted)', color: 'var(--fg)' }}
+                                                    title="View Change History"
                                                 >
-                                                    History
+                                                    📜
                                                 </button>
                                                 <button
-                                                    className="action-btn"
-                                                    onClick={() => handleDeleteClick(p.id, p.name)}
-                                                    style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', background: 'var(--col-danger)' }}
+                                                    className="action-chip edit"
+                                                    onClick={() => handleEditClick(p)}
+                                                    title="Edit Project"
                                                 >
-                                                    Delete
+                                                    ✏️
+                                                </button>
+                                                <button
+                                                    className="action-chip delete"
+                                                    onClick={() => handleDeleteClick(p.id, p.name)}
+                                                    title="Delete Project"
+                                                >
+                                                    🗑️
                                                 </button>
                                             </div>
                                         </td>
@@ -254,7 +325,11 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
                             })}
                         </tbody>
                     </table>
-                    {projects.length === 0 && <p style={{ opacity: 0.5, textAlign: 'center', marginTop: '1rem' }}>No projects found.</p>}
+                    {projects.length === 0 && (
+                        <div style={{ padding: '3rem', textAlign: 'center' }}>
+                            <p style={{ opacity: 0.5, fontSize: '0.9rem', fontWeight: 600 }}>No projects found in the system.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 

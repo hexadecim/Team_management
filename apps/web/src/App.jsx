@@ -62,27 +62,6 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Browser close detection
-  useEffect(() => {
-    if (!token) return;
-
-    const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable async logout on browser close
-      const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
-      navigator.sendBeacon(
-        `${API_BASE}/auth/logout`,
-        blob
-      );
-      // Note: Authorization header cannot be set with sendBeacon
-      // The session will be invalidated based on cookies or other mechanisms
-      // For now, we'll clear local storage
-      localStorage.removeItem('vibe-token');
-      localStorage.removeItem('vibe-refresh-token');
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [token]);
 
   const [view, setView] = useState('dashboard');
   const [adminView, setAdminView] = useState('users'); // 'users' or 'roles'
@@ -161,11 +140,21 @@ function App() {
   const { showWarning, handleStayLoggedIn } = useSessionTimeout(token, handleLogout, addToast);
 
   useEffect(() => {
-    if (token) {
+    if (!token) return;
+
+    // Initial fetch
+    fetchEmployees();
+    fetchProjects();
+    fetchAllocations();
+
+    // Polling interval (2 seconds)
+    const interval = setInterval(() => {
       fetchEmployees();
       fetchProjects();
       fetchAllocations();
-    }
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, [token]);
 
   const canView = (permission) => {
@@ -469,6 +458,9 @@ function App() {
                 token={token}
                 canEdit={canEdit}
                 addToast={addToast}
+                employees={employees}
+                projects={projects}
+                onRefresh={fetchEmployees}
                 fetchAllocations={fetchAllocations}
               />
             )}

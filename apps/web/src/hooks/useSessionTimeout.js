@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes
-const WARNING_TIMEOUT = 19 * 60 * 1000;    // 19 minutes
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const WARNING_TIMEOUT = 9 * 60 * 1000;    // 9 minutes
 
 export const useSessionTimeout = (token, onLogout, addToast) => {
     const [showWarning, setShowWarning] = useState(false);

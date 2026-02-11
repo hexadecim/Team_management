@@ -534,6 +534,93 @@ tr:hover {
   color: var(--bg);
 }
 
+/* Action Chips - Modern substitutes for action buttons */
+.action-chip {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.action-chip:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.95);
+}
+
+.action-chip:active {
+  transform: translateY(0);
+}
+
+.action-chip.edit {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.action-chip.history {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.action-chip.delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Modern Table Enhancements */
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.modern-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 800;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.modern-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--fg);
+  vertical-align: middle;
+}
+
+.modern-table tr:last-child td {
+  border-bottom: none;
+}
+
+.modern-table tr:hover {
+  background: #f1f5f9;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
 
 
 /* Control Bar */

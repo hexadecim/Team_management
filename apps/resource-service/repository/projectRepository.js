@@ -13,32 +13,32 @@ class ProjectRepository {
      */
     async getAll() {
         const result = await db.queryCore(
-            'SELECT id, name, start_date, end_date, original_end_date FROM core.projects ORDER BY name'
+            'SELECT id, name, start_date, end_date, original_end_date, planned_budget, average_working_hours FROM core.projects ORDER BY name'
         );
         return result.rows;
     }
 
     async getById(id) {
         const result = await db.queryCore(
-            'SELECT id, name, start_date, end_date, original_end_date FROM core.projects WHERE id = $1',
+            'SELECT id, name, start_date, end_date, original_end_date, planned_budget, average_working_hours FROM core.projects WHERE id = $1',
             [id]
         );
         return result.rows[0] || null;
     }
 
     async create(project) {
-        const { name, start_date, end_date } = project;
+        const { name, start_date, end_date, planned_budget, average_working_hours } = project;
         const result = await db.queryCore(
-            `INSERT INTO core.projects (name, start_date, end_date, original_end_date) 
-             VALUES ($1, $2, $3, $3) 
-             RETURNING id, name, start_date, end_date, original_end_date`,
-            [name, start_date, end_date]
+            `INSERT INTO core.projects (name, start_date, end_date, original_end_date, planned_budget, average_working_hours) 
+             VALUES ($1, $2, $3, $3, $4, $5) 
+             RETURNING id, name, start_date, end_date, original_end_date, planned_budget, average_working_hours`,
+            [name, start_date, end_date, planned_budget || null, average_working_hours || 160]
         );
         return result.rows[0];
     }
 
     async update(id, project, username = 'system', changeReason = null) {
-        const { name, end_date } = project;
+        const { name, end_date, planned_budget, average_working_hours } = project;
 
         try {
             // Begin transaction
@@ -57,10 +57,13 @@ class ProjectRepository {
             // Perform the update
             const result = await db.queryCore(
                 `UPDATE core.projects 
-                 SET name = COALESCE($1, name), end_date = COALESCE($2, end_date)
-                 WHERE id = $3 
-                 RETURNING id, name, start_date, end_date, original_end_date`,
-                [name, end_date, id]
+                 SET name = COALESCE($1, name), 
+                     end_date = COALESCE($2, end_date),
+                     planned_budget = COALESCE($3, planned_budget),
+                     average_working_hours = COALESCE($4, average_working_hours)
+                 WHERE id = $5 
+                 RETURNING id, name, start_date, end_date, original_end_date, planned_budget, average_working_hours`,
+                [name, end_date, planned_budget, average_working_hours, id]
             );
 
             // Commit transaction

@@ -48,6 +48,7 @@ const userRepo = require('./repository/userRepository');
 const employeeRepo = require('./repository/employeeRepository');
 const projectRepo = require('./repository/projectRepository');
 const allocationRepo = require('./repository/allocationRepository');
+const financialCalculationService = require('./services/financialCalculationService');
 const SMTPConfigRepository = require('../../packages/shared/repositories/smtpConfigRepository');
 const smtpConfigRepo = new SMTPConfigRepository();
 const { db, emailService } = require('@team-mgmt/shared');
@@ -112,7 +113,7 @@ app.use(express.json({ limit: '1mb' })); // Limit request body size
 // Rate Limiting - Global
 const globalLimiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -904,6 +905,67 @@ app.get('/analytics/project-deviations', authenticate, checkPermission('dashboar
         res.send(analytics);
     } catch (error) {
         console.error('[Get Deviation Analytics Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// ============================================
+// PROJECT FINANCIAL ENDPOINTS
+// ============================================
+
+// Get project financial summary
+app.get('/projects/:id/financials', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+    try {
+        const financials = await financialCalculationService.getProjectFinancialSummary(req.params.id);
+        res.send(financials);
+    } catch (error) {
+        console.error('[Get Project Financials Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Get monthly billing projections
+app.get('/projects/:id/billing-monthly', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+    try {
+        const billing = await financialCalculationService.getMonthlyBilling(req.params.id);
+        res.send(billing);
+    } catch (error) {
+        console.error('[Get Monthly Billing Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Get monthly expense projections
+app.get('/projects/:id/expenses-monthly', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+    try {
+        const expenses = await financialCalculationService.getMonthlyExpenses(req.params.id);
+        res.send(expenses);
+    } catch (error) {
+        console.error('[Get Monthly Expenses Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Trigger financial recalculation for a project
+app.post('/projects/:id/recalculate', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const result = await financialCalculationService.calculateProjectFinancials(req.params.id);
+        await AuditLogger.logAuth(req.user.username, 'PROJECT_FINANCIALS_RECALCULATED', true, { projectId: req.params.id });
+        res.send(result);
+    } catch (error) {
+        console.error('[Recalculate Project Financials Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Recalculate all projects (admin only)
+app.post('/projects/recalculate-all', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const results = await financialCalculationService.recalculateAllProjects();
+        await AuditLogger.logAuth(req.user.username, 'ALL_PROJECT_FINANCIALS_RECALCULATED', true, { count: results.length });
+        res.send(results);
+    } catch (error) {
+        console.error('[Recalculate All Projects Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });

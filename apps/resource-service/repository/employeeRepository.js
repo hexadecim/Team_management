@@ -160,22 +160,26 @@ class EmployeeRepository {
      * @throws {Error} If employee has active allocations
      */
     async delete(id) {
-        console.log('[EmployeeRepo] delete() called for ID:', id);
+        console.log('[EmployeeRepo] delete() called for ID:', id, 'Type:', typeof id);
+
         // Check if employee has any allocations
-        const allocCheck = await db.queryCore(
-            'SELECT COUNT(*) as count FROM core.allocations WHERE employee_id = $1',
-            [id]
-        );
+        const queryText = 'SELECT COUNT(*) as count FROM core.allocations WHERE employee_id = $1::uuid';
+        console.log('[EmployeeRepo] Running check query:', queryText, 'with ID:', id);
+
+        const allocCheck = await db.queryCore(queryText, [id]);
 
         const allocationCount = parseInt(allocCheck.rows[0].count);
-        console.log('[EmployeeRepo] Allocation count:', allocationCount);
+        console.log('[EmployeeRepo] Result rows:', allocCheck.rows);
+        console.log('[EmployeeRepo] Allocation count found:', allocationCount);
+
         if (allocationCount > 0) {
-            console.log('[EmployeeRepo] Throwing error - employee has allocations');
+            console.log('[EmployeeRepo] Blocking deletion - active allocations exist');
             throw new Error(`Cannot delete employee: ${allocationCount} active allocation(s) exist. Please remove all allocations first.`);
         }
 
-        console.log('[EmployeeRepo] No allocations found, proceeding with deletion');
-        const result = await db.queryCore('DELETE FROM core.employees WHERE id = $1', [id]);
+        console.log('[EmployeeRepo] No allocations found in DB check, proceeding with deletion for ID:', id);
+        const result = await db.queryCore('DELETE FROM core.employees WHERE id = $1::uuid', [id]);
+        console.log('[EmployeeRepo] Delete result rowCount:', result.rowCount);
         return result.rowCount > 0;
     }
 
