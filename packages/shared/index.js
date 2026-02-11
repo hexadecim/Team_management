@@ -5,7 +5,9 @@
  */
 
 const db = require('./db');
+const emailService = require('./services/emailService');
 
 module.exports = {
-    db
+    db,
+    emailService
 };

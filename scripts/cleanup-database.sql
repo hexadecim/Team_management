@@ -26,4 +26,4 @@ SELECT 'Projects remaining:' as info, COUNT(*) as count FROM core.projects;
 SELECT 'Allocations remaining:' as info, COUNT(*) as count FROM core.allocations;
 
 -- Display admin user details
-SELECT username, roles FROM iam.users WHERE username = 'admin';
+SELECT username, role_names FROM iam.users WHERE username = 'admin';

@@ -48,7 +48,9 @@ const userRepo = require('./repository/userRepository');
 const employeeRepo = require('./repository/employeeRepository');
 const projectRepo = require('./repository/projectRepository');
 const allocationRepo = require('./repository/allocationRepository');
-const { db } = require('@team-mgmt/shared');
+const SMTPConfigRepository = require('../../packages/shared/repositories/smtpConfigRepository');
+const smtpConfigRepo = new SMTPConfigRepository();
+const { db, emailService } = require('@team-mgmt/shared');
 const AuditLogger = require('./middleware/auditLogger');
 const SecurityMonitor = require('./middleware/securityMonitor');
 
@@ -935,6 +937,19 @@ app.post('/allocations', authenticate, checkPermission('allocation', 'rw'), asyn
             endDate: allocation.endDate
         });
 
+        // Send email notification (async, don't block response)
+        (async () => {
+            try {
+                const employee = await employeeRepo.getById(allocation.employeeId);
+                const project = await projectRepo.getById(allocation.projectId);
+                if (employee && project) {
+                    await emailService.sendAllocationCreatedNotification(allocation, employee, project);
+                }
+            } catch (err) {
+                console.error('[Email Notification Error]', err);
+            }
+        })();
+
         res.status(201).send(allocation);
     } catch (error) {
         if (error.message.includes('Total allocation cannot exceed 100%')) {
@@ -975,6 +990,19 @@ app.put('/allocations/:id', authenticate, checkPermission('allocation', 'rw'), a
             changes: req.body
         });
 
+        // Send email notification (async, don't block response)
+        (async () => {
+            try {
+                const employee = await employeeRepo.getById(allocation.employeeId);
+                const project = await projectRepo.getById(allocation.projectId);
+                if (employee && project) {
+                    await emailService.sendAllocationUpdatedNotification(oldAllocation, allocation, employee, project);
+                }
+            } catch (err) {
+                console.error('[Email Notification Error]', err);
+            }
+        })();
+
         res.send(allocation);
     } catch (error) {
         if (error.message.includes('Total allocation cannot exceed 100%')) {
@@ -1003,6 +1031,19 @@ app.delete('/allocations/:id', authenticate, checkPermission('allocation', 'rw')
             startDate: allocation.startDate,
             endDate: allocation.endDate
         });
+
+        // Send email notification (async, don't block response)
+        (async () => {
+            try {
+                const employee = await employeeRepo.getById(allocation.employeeId);
+                const project = await projectRepo.getById(allocation.projectId);
+                if (employee && project) {
+                    await emailService.sendAllocationDeletedNotification(allocation, employee, project);
+                }
+            } catch (err) {
+                console.error('[Email Notification Error]', err);
+            }
+        })();
 
         res.status(204).send();
     } catch (error) {
@@ -1038,6 +1079,93 @@ app.post('/resources', async (req, res) => {
     }
 
     res.status(201).send(resource);
+});
+
+// ============================================
+// SMTP CONFIGURATION ENDPOINTS
+// ============================================
+
+// Get SMTP configuration (admin only, without password)
+app.get('/smtp-config', authenticate, checkPermission('administration', 'r'), async (req, res) => {
+    try {
+        const config = await smtpConfigRepo.getWithoutPassword();
+        res.send(config || {});
+    } catch (error) {
+        console.error('[Get SMTP Config Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Create or update SMTP configuration (admin only)
+app.post('/smtp-config', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const config = await smtpConfigRepo.upsert(req.body, req.user.username);
+
+        // Audit log the configuration change
+        await AuditLogger.logAuth(req.user.username, 'SMTP_CONFIG_UPDATED', true, {
+            smtp_host: config.smtpHost,
+            smtp_port: config.smtpPort,
+            from_email: config.fromEmail,
+            enabled: config.enabled
+        });
+
+        // Reinitialize email service with new config
+        await emailService.initializeTransporter();
+
+        res.send({ success: true, config });
+    } catch (error) {
+        console.error('[Update SMTP Config Error]', error);
+        await AuditLogger.logAuth(req.user.username, 'SMTP_CONFIG_UPDATE_FAILED', false, {
+            error: error.message
+        });
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Test SMTP configuration (admin only)
+app.post('/smtp-config/test', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const { testEmail } = req.body;
+
+        if (!testEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+            return res.status(400).send({ error: 'Valid test email is required' });
+        }
+
+        const result = await emailService.sendTestEmail(testEmail);
+
+        if (result.success) {
+            await AuditLogger.logAuth(req.user.username, 'SMTP_TEST_EMAIL_SENT', true, {
+                test_email: testEmail
+            });
+            res.send({ success: true, message: 'Test email sent successfully' });
+        } else {
+            await AuditLogger.logAuth(req.user.username, 'SMTP_TEST_EMAIL_FAILED', false, {
+                test_email: testEmail,
+                error: result.error
+            });
+            res.status(500).send({ success: false, error: result.error });
+        }
+    } catch (error) {
+        console.error('[Test SMTP Config Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// Delete SMTP configuration (admin only)
+app.delete('/smtp-config', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const deleted = await smtpConfigRepo.delete();
+
+        if (deleted) {
+            await AuditLogger.logAuth(req.user.username, 'SMTP_CONFIG_DELETED', true, {});
+            res.status(204).send();
+        } else {
+            res.status(404).send({ error: 'SMTP configuration not found' });
+        }
+    } catch (error) {
+        console.error('[Delete SMTP Config Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
 });
 
 // ============================================

@@ -9,6 +9,7 @@ import ProjectManager from './components/ProjectManager';
 import Logo from './components/Logo';
 import EmployeeManager from './components/EmployeeManager';
 import Sidebar from './components/Sidebar';
+import SMTPConfig from './components/SMTPConfig';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 
 const API_BASE = 'http://localhost:4001';
@@ -427,10 +428,18 @@ function App() {
               >
                 Role Management
               </div>
+              <div
+                className={`tab ${adminView === 'smtp' ? 'active' : ''}`}
+                onClick={() => setAdminView('smtp')}
+                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+              >
+                Email Settings
+              </div>
             </div>
 
             {adminView === 'users' && <UserManager token={token} addToast={addToast} />}
             {adminView === 'roles' && <RoleManager token={token} addToast={addToast} />}
+            {adminView === 'smtp' && <SMTPConfig token={token} addToast={addToast} />}
           </div>
         )}
 

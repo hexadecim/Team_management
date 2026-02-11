@@ -22,7 +22,7 @@ This guide documents the cleanup process to prepare the Team Management applicat
 
 ```bash
 # Run the cleanup script
-psql -U sanjayrana -d team_management -f scripts/cleanup-database.sql
+psql -U sanjayrana -d team_management -f psscripts/cleanup-database.sql
 ```
 
 Or manually execute the SQL commands:
