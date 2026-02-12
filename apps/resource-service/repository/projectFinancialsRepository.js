@@ -190,6 +190,59 @@ class ProjectFinancialsRepository {
         );
         return result.rowCount;
     }
+
+    /**
+     * Get all project financials
+     * @returns {Promise<Array>} Array of project financials
+     */
+    async getAllProjectFinancials() {
+        const result = await db.queryCore(
+            `SELECT 
+                project_id as "projectId",
+                planned_budget as "plannedBudget",
+                total_projected_billing as "totalProjectedBilling",
+                total_projected_expense as "totalProjectedExpense",
+                total_projected_profit as "totalProjectedProfit",
+                budget_variance as "budgetVariance",
+                last_calculated_at as "lastCalculatedAt"
+             FROM core.project_financials`
+        );
+        return result.rows;
+    }
+
+    /**
+     * Get all monthly billing projections
+     * @returns {Promise<Array>} Array of all monthly billing records
+     */
+    async getAllMonthlyBilling() {
+        const result = await db.queryCore(
+            `SELECT 
+                project_id as "projectId",
+                month_year as "monthYear",
+                projected_billing as "projectedBilling",
+                cumulative_billing as "cumulativeBilling"
+             FROM core.project_billing_monthly
+             ORDER BY month_year ASC`
+        );
+        return result.rows;
+    }
+
+    /**
+     * Get all monthly expense projections
+     * @returns {Promise<Array>} Array of all monthly expense records
+     */
+    async getAllMonthlyExpenses() {
+        const result = await db.queryCore(
+            `SELECT 
+                project_id as "projectId",
+                month_year as "monthYear",
+                projected_expense as "projectedExpense",
+                cumulative_expense as "cumulativeExpense"
+             FROM core.project_expenses_monthly
+             ORDER BY month_year ASC`
+        );
+        return result.rows;
+    }
 }
 
 module.exports = new ProjectFinancialsRepository();

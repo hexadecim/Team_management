@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE = 'http://localhost:4001';
+import { API_BASE } from '../config';
 
 function UserManager({ token, addToast }) {
     const [users, setUsers] = useState([]);
@@ -24,7 +23,11 @@ function UserManager({ token, addToast }) {
             const res = await fetch(`${API_BASE}/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setUsers(await res.json());
+            if (res.ok) {
+                setUsers(await res.json());
+            } else {
+                console.error('Fetch users failed', res.status);
+            }
         } catch (err) { console.error(err); }
     };
 
@@ -33,7 +36,11 @@ function UserManager({ token, addToast }) {
             const res = await fetch(`${API_BASE}/roles`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setRoles(await res.json());
+            if (res.ok) {
+                setRoles(await res.json());
+            } else {
+                console.error('Fetch roles failed', res.status);
+            }
         } catch (err) { console.error(err); }
     };
 
@@ -206,7 +213,7 @@ function UserManager({ token, addToast }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {users.map(u => (
+                            {Array.isArray(users) && users.map(u => (
                                 <tr key={u.username}>
                                     <td><strong>{u.username}</strong></td>
                                     <td>
@@ -222,10 +229,10 @@ function UserManager({ token, addToast }) {
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                                            {u.roles.map(r => (
+                                            {Array.isArray(u.roles) && u.roles.map(r => (
                                                 <span key={r} className="chip primary" style={{ fontSize: '0.7rem' }}>{r}</span>
                                             ))}
-                                            {u.roles.length === 0 && <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>No roles</span>}
+                                            {(!u.roles || u.roles.length === 0) && <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>No roles</span>}
                                         </div>
                                     </td>
                                     <td>
@@ -234,11 +241,11 @@ function UserManager({ token, addToast }) {
                                                 {isEditingRoles && (
                                                     <div style={{ marginBottom: '0.5rem' }}>
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--card-bg)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', marginBottom: '0.5rem' }}>
-                                                            {roles.map(r => (
+                                                            {Array.isArray(roles) && roles.map(r => (
                                                                 <label key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer' }}>
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={editingUser.roles.includes(r.name)}
+                                                                        checked={Array.isArray(editingUser.roles) && editingUser.roles.includes(r.name)}
                                                                         onChange={() => handleToggleEditingRole(r.name)}
                                                                     />
                                                                     {r.name}
@@ -254,11 +261,11 @@ function UserManager({ token, addToast }) {
                                                 {isEditingProjects && (
                                                     <div style={{ marginBottom: '0.5rem' }}>
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--card-bg)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', marginBottom: '0.5rem' }}>
-                                                            {projects.map(p => (
+                                                            {Array.isArray(projects) && projects.map(p => (
                                                                 <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer' }}>
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={editingUser.project_ids.includes(p.id)}
+                                                                        checked={Array.isArray(editingUser.project_ids) && editingUser.project_ids.includes(p.id)}
                                                                         onChange={() => handleToggleEditingProject(p.id)}
                                                                     />
                                                                     {p.name}
@@ -317,27 +324,27 @@ function UserManager({ token, addToast }) {
                         <div className="input-group">
                             <label>Assign Projects</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem', maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '4px' }}>
-                                {projects.map(p => (
+                                {Array.isArray(projects) && projects.map(p => (
                                     <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                                         <input
                                             type="checkbox"
-                                            checked={newUser.project_ids.includes(p.id)}
+                                            checked={Array.isArray(newUser.project_ids) && newUser.project_ids.includes(p.id)}
                                             onChange={() => handleToggleNewUserProject(p.id)}
                                         />
                                         {p.name}
                                     </label>
                                 ))}
-                                {projects.length === 0 && <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>No projects available</span>}
+                                {(!projects || projects.length === 0) && <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>No projects available</span>}
                             </div>
                         </div>
                         <div className="input-group">
                             <label>Assign Roles</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                {roles.map(r => (
+                                {Array.isArray(roles) && roles.map(r => (
                                     <label key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                         <input
                                             type="checkbox"
-                                            checked={newUser.roles.includes(r.name)}
+                                            checked={Array.isArray(newUser.roles) && newUser.roles.includes(r.name)}
                                             onChange={() => handleToggleNewUserRole(r.name)}
                                         />
                                         {r.name}

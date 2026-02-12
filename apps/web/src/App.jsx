@@ -11,8 +11,7 @@ import EmployeeManager from './components/EmployeeManager';
 import Sidebar from './components/Sidebar';
 import SMTPConfig from './components/SMTPConfig';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
-
-const API_BASE = 'http://localhost:4001';
+import { API_BASE } from './config';
 
 const INITIAL_FORM = {
   firstName: '',
@@ -152,7 +151,7 @@ function App() {
       fetchEmployees();
       fetchProjects();
       fetchAllocations();
-    }, 2000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [token]);
@@ -397,7 +396,7 @@ function App() {
         )}
 
         {view === 'projects_analysis' && canView('project_analysis') && (
-          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} />
+          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} />
         )}
 
         {view === 'admin' && canView('administration') && (

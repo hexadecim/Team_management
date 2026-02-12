@@ -1,7 +1,44 @@
 # Low-Level Technical Design: Team Management System
 
 ## 1. System Overview
-The Team Management System is a microservices-based application built on top of a centralized PostgreSQL database. It features a robust Role-Based Access Control (RBAC) layer, automated data integrity checks, and high-performance analytics using Materialized Views.
+The Team Management System is a microservices-based application built on top of a centralized PostgreSQL database. It features a robust **Zero Trust** security layer, automated data integrity triggers, and a dual-layer financial calculation architecture (persisted backend metrics with active frontend fallbacks).
+
+### 1.1 Architecture Block Diagram
+```mermaid
+architecture-beta
+    group frontend(cloud)[Frontend Layer]
+    service ui(server)[UI Components] in frontend
+    service fe_sec(lock)[Security Context] in frontend
+    service calc_fb(calculate)[Frontend Calc Fallback] in frontend
+
+    group security(shield)[Security & API Gateway]
+    service cors(shield)[Strict CORS] in security
+    service auth_mw(key)[Auth Middleware] in security
+    service rbac_mw(lock)[RBAC Policy] in security
+
+    group backend(server)[Backend Services]
+    service res_svc(gear)[Resource Service] in backend
+    service fin_svc(calculate)[Financial Calc SVC] in backend
+
+    group infrastructure(server)[Shared Infrastructure]
+    service sh_lib(book)[Shared Library] in infrastructure
+
+    group database(database)[Data Layer]
+    service iam_schema(database)[IAM Schema] in database
+    service core_schema(database)[Core Schema] in database
+
+    %% Interactions
+    edge ui, fe_sec
+    edge ui, calc_fb
+    edge ui, cors
+    edge cors, auth_mw
+    edge auth_mw, rbac_mw
+    edge rbac_mw, res_svc
+    edge res_svc, fin_svc
+    edge res_svc, sh_lib
+    edge sh_lib, iam_schema
+    edge fin_svc, core_schema
+```
 
 ---
 
@@ -9,82 +46,75 @@ The Team Management System is a microservices-based application built on top of 
 The database is partitioned into two logical schemas to separate concerns.
 
 ### 2.1 IAM Schema (Identity & Access Management)
-Used for authentication and authorization.
-- **`iam.users`**: Stores user credentials and a deprecated `role_names` array for fallback.
-- **`iam.roles`**: Stores role definitions and a JSONB `permissions` matrix (e.g., `{"employee_list": "rw"}`).
-- **`iam.user_roles`**: **(Normalized Junction Table)**. Links users to roles in a many-to-many relationship. This supports users having multiple active roles simultaneously.
+Used for authentication, authorization, and session persistence.
+- **`iam.users`**: Stores user credentials.
+- **`iam.roles`**: Stores role definitions and a JSONB `permissions` matrix.
+- **`iam.user_roles`**: Many-to-many junction table for roles.
+- **`iam.sessions`**: **[NEW]** Tracks active sessions, IP addresses, and inactivity timestamps.
+- **`iam.refresh_tokens`**: **[NEW]** Stores cryptographically hashed refresh tokens for persistent login.
 
 ### 2.2 Core Schema (Resources & Operations)
-Stores the operational data of the organization.
-- **`core.employees`**: Stores employee details, denormalized `total_allocation_sum`, and financial tracking fields: `billable_rate` and `expense_rate`.
-- **`core.projects`**: Project metadata.
-- **`core.allocations`**: Tracks employee-project assignments with percentage and dates. This table is the source of truth for all financial and utilization calculations.
+Stores the operational and financial data.
+- **`core.employees`**: Includes `billable_rate`, `expense_rate`, and `total_allocation_sum`.
+- **`core.projects`**: Includes `planned_budget` and project timelines.
+- **`core.allocations`**: The primary source of truth for assignments.
+- **`core.project_financials`**: **[NEW]** Persists calculated metrics: `used_budget`, `remaining_surplus`, and `total_projected_profit`.
+- **`core.project_billing_monthly` / `core.project_expenses_monthly`**: **[NEW]** Stores time-series financial projections to optimize dashboard loading.
 
 ### 2.3 Data Integrity & Automation
-- **`trg_check_allocation_limit`**: A `BEFORE INSERT/UPDATE` trigger on `core.allocations` that sums an employee's current usage. It prevents any record that would exceed 100% total allocation by raising a `data_exception`.
-- **`trg_update_allocation_sum`**: An `AFTER INSERT/UPDATE/DELETE` trigger that synchronizes the `total_allocation_sum` in `core.employees`.
-- **`dashboard_analytics_summary`**: **(Materialized View)**. Pre-aggregates Average Utilization, Bench Count, and Monthly Utilization.
-- **`trg_refresh_analytics_summary`**: Automatically refreshes the Materialized View whenever an allocation is modified, ensuring "Live" analytics.
+- **`trg_check_allocation_limit`**: Prevents over-allocation (>100% per employee).
+- **`trg_update_allocation_sum`**: Synchronizes employee allocation totals.
+- **`dashboard_analytics_summary`**: Materialized View for global utilization.
+- **Deletion Guardrails**: **[NEW]** Repository-level checks prevent deletion of employees or projects with active allocations to maintain referential integrity.
 
 ---
 
 ## 3. Shared Library (`@team-mgmt/shared`)
-A centralized package used across all Node.js microservices to ensure architectural consistency.
+A centralized package for consistency across services.
 
 ### 3.1 Connection Pooling
-Uses `pg.Pool` with global configuration for host, port, and max/min connections. Distributed services share the same connection logic but execute queries within their respective contexts.
+Uses `pg.Pool` with global configuration.
 
 ### 3.2 Permission Resolver (`getPermissions`)
-A critical logic block that:
-1. Queries `iam.user_roles` and `iam.roles` for a specific user.
-2. Aggregated multiple roles into a single **Permission Matrix**.
-3. Resolution Strategy: `rw` (Read-Write) > `r` (Read) > `none`.
-4. Resulting Object: `{ "employee_list": "rw", "allocation": "r" }`.
+Aggregates multiple user roles into a single Permission Matrix (Strategy: `rw` > `r` > `none`).
 
 ---
 
 ## 4. Backend Architecture
 
 ### 4.1 Resource Service (Core API)
-Responsible for Managing IAM and Core resources.
-- **Auth Middleware**: Validates incoming `Authorization: Bearer <JWT>` headers.
-- **RBAC Middleware**: Implements `checkPermission(module, level)`. It inspects the `claims` embedded in the JWT to decide if the request should proceed to the repository layer.
-- **Error Handling**: Standardizes PostgreSQL exceptions (like trigger violations) into `400 Bad Request` or `403 Forbidden` HTTP responses.
+- **Zero Trust Security**:
+    - **CORS**: Strict whitelist matching against `ALLOWED_ORIGINS`.
+    - **JWT + Refresh Tokens**: Short-lived access tokens with long-lived, database-backed refresh tokens.
+    - **Rate Limiting**: Global and auth-specific limits (standard: 5000 req / 15 min).
+- **Financial Engine**: **[NEW]** `FinancialCalculationService` triggers a full project recalculation on every `POST/PUT/DELETE` of allocations or projects, ensuring the `core.project_financials` table is always current.
 
 ### 4.2 Analytics Service
-A high-performance, stateless microservice.
-- **Design Strategy**: Uses a hybrid approach. Global utilization and bench metrics are fetched from the `core.dashboard_analytics_summary` Materialized View for O(1) retrieval. Lifetime project profitability and burnrates are calculated on-the-fly to support dynamic filtering and "Real-time" what-if scenarios.
+- **Strategy**: Serves pre-calculated financial data from the persistent tables for high-speed dashboard rendering, eliminating the need for complex on-the-fly aggregations for standard views.
 
 ---
 
 ## 5. Frontend Architecture (React)
 
-### 5.1 Security Persistence
-- **JWT Storage**: Tokens are stored in `localStorage`.
-- **Authenticated Requests**: All API calls utilize an interceptor-like pattern to inject the `token` into headers.
+### 5.1 Security & Session Management
+- **Persistence**: Sessions persist across page refreshes by validating the `accessToken` and automatically using `refreshToken` if expired.
+- **Inactivity Timeout**: Strict 10-minute inactivity monitor (notifies user at 9m).
 
 ### 5.2 RBAC-Aware UI
-The UI dynamically adapts based on the `claims` object inside the decoded JWT:
-- **Tab Visibility**: Tabs like "Administration" are hidden if the user has `none` level access.
-- **Conditional Action Rendering**: "Edit" and "Remove" buttons in the Employee List are conditionally rendered using `canEdit('employee_list')`.
-- **Form Protection**: Validation errors from the backend (like the 100% limit) are bubbled up via a Toast notification system.
-- **Bulk Import Validation**: Implements client-side pre-processing of CSV data to validate project exists, emails are unique, and financial formats are correct before hitting the API.
+- **Dynamic Rendering**: Navigation and action buttons (Edit/Delete) are hidden based on the Permission Matrix.
+- **Validation**: Server-side errors (e.g., Deletion blocked by Guardrail) are displayed via global Toast notifications.
 
 ### 5.3 Financial Analytics Engine
-The system implements a sophisticated client-side analytics engine for project health:
-- **Lifetime Aggregation**: Scans the entire project history to calculate cumulative Income (Billable * Hours) and Expense (Cost * Hours).
-- **Monthly Burnrate Line**: Calculates the current month's overhead by summing expense rates of all active project members.
-- **Margin Visualization**: Uses a **Composed Chart (Bar + Line)** to contrast long-term profitability (bars) against current operational velocity (line).
+- **Hybrid Source**: Primarily pulls from backend persistent tables.
+- **Active Fallback**: Contains an identical implementation of the calculation logic to provide instant "what-if" feedback and dashboard stability if the primary API response is delayed.
+- **Formatting**: Implements automated Y-axis scaling (`$k` units) for large financial projections.
 
 ---
 
 ## 6. Request Interconnection Flow (Example: Assign Project)
-1. **Frontend**: User clicks "Assign" on the Allocation Board.
-2. **Frontend**: Validates local inputs and sends `POST /allocations` with JWT.
-3. **Backend**: `authenticate` middleware verifies JWT.
-4. **Backend**: `checkPermission('allocation', 'rw')` middleware verifies the user has write access.
-5. **Database**: `trg_check_allocation_limit` trigger calculates the sum in PostgreSQL.
-6. **Database**: If total > 100%, trigger raises error; otherwise, record is saved.
-7. **Database**: `trg_refresh_analytics_summary` trigger signals a Materialized View refresh.
-8. **Backend**: Maps DB error (if any) to HTTP 400 or returns 201 Success.
-9. **Frontend**: Receives response and displays Toast (Success or Capacity Error).
+1. **Frontend**: User submits allocation; UI calculates an "Instant Preview".
+2. **Backend**: `authenticate` and `checkPermission` verify zero-trust credentials.
+3. **Database**: `trg_check_allocation_limit` validates capacity.
+4. **Backend**: Post-commit, `FinancialCalculationService` asynchronously triggers a project-wide recalculation.
+5. **Database**: `core.project_financials` and monthly tables are updated.
+6. **Frontend**: Polling (2s interval) detects the updated backend state and refreshes the "USED" and "REMAINING" budget cards.

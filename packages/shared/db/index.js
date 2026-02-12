@@ -5,7 +5,9 @@
  * Provides schema-aware query helpers for iam and core schemas.
  */
 
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+// Set DATE (OID 1082) to return as string instead of Date object to avoid timezone shifts
+types.setTypeParser(1082, val => val);
 const config = require('./config');
 
 // Create connection pool

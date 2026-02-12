@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE = 'http://localhost:4001';
+import { API_BASE } from '../config';
 
 const INITIAL_FORM = {
     firstName: '',
@@ -22,14 +21,14 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees
     const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     // Filter employees based on search
-    const employees = allEmployees.filter(emp => {
+    const employees = (Array.isArray(allEmployees) ? allEmployees : []).filter(emp => {
         if (!search) return true;
         const q = search.toLowerCase();
         return (
-            emp.firstName.toLowerCase().includes(q) ||
-            emp.lastName.toLowerCase().includes(q) ||
+            (emp.firstName && emp.firstName.toLowerCase().includes(q)) ||
+            (emp.lastName && emp.lastName.toLowerCase().includes(q)) ||
             (emp.email && emp.email.toLowerCase().includes(q)) ||
-            (emp.primarySkills && emp.primarySkills.some(s => s.toLowerCase().includes(q))) ||
+            (Array.isArray(emp.primarySkills) && emp.primarySkills.some(s => s.toLowerCase().includes(q))) ||
             (emp.projectName && emp.projectName.toLowerCase().includes(q))
         );
     });
@@ -185,7 +184,7 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees
                         </tr>
                     </thead>
                     <tbody>
-                        {employees.map(emp => (
+                        {Array.isArray(employees) && employees.map(emp => (
                             <tr key={emp.id}>
                                 <td>
                                     <div><strong>{emp.firstName} {emp.lastName}</strong></div>
@@ -193,7 +192,7 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees
                                 </td>
                                 <td>
                                     <div className="chip-container">
-                                        {emp.projectName?.split(', ').map(p => (
+                                        {emp.projectName && emp.projectName.split(', ').map(p => (
                                             <span key={p} className="chip project">{p}</span>
                                         ))}
                                     </div>
@@ -263,9 +262,10 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees
                                 onChange={e => setFormData({ ...formData, currentProject: e.target.value })}
                             >
                                 <option value="">No specific project assigned</option>
-                                {projects.map(p => (
+                                {Array.isArray(projects) && projects.map(p => (
                                     <option key={p.id} value={p.name}>{p.name}</option>
                                 ))}
+                                {!projects || projects.length === 0 && <option disabled>No projects found</option>}
                             </select>
                         </div>
 

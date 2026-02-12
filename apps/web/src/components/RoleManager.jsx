@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE = 'http://localhost:4001';
+import { API_BASE } from '../config';
 
 function RoleManager({ token, addToast }) {
     const [roles, setRoles] = useState([]);
@@ -25,7 +24,11 @@ function RoleManager({ token, addToast }) {
             const res = await fetch(`${API_BASE}/roles`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setRoles(await res.json());
+            if (res.ok) {
+                setRoles(await res.json());
+            } else {
+                console.error('Fetch roles failed', res.status);
+            }
         } catch (err) { console.error(err); }
     };
 
@@ -156,12 +159,12 @@ function RoleManager({ token, addToast }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {roles.map(r => (
+                            {Array.isArray(roles) && roles.map(r => (
                                 <tr key={r.id}>
                                     <td><strong>{r.name}</strong></td>
                                     <td>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                                            {Object.entries(r.permissions).map(([k, v]) => (
+                                            {r.permissions && Object.entries(r.permissions).map(([k, v]) => (
                                                 <span key={k} className="chip project" style={{ fontSize: '0.65rem', textTransform: 'capitalize' }}>
                                                     {k.replace('_', ' ')}: {v}
                                                 </span>

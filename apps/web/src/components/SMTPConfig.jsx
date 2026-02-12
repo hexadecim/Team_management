@@ -4,8 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-
-const API_BASE = 'http://localhost:4001';
+import { API_BASE } from '../config';
 
 function SMTPConfig({ token, addToast }) {
     const [config, setConfig] = useState({
@@ -50,6 +49,8 @@ function SMTPConfig({ token, addToast }) {
                     });
                     setHasConfig(true);
                 }
+            } else {
+                console.error('Fetch SMTP config failed', res.status);
             }
         } catch (error) {
             console.error('Error loading SMTP config:', error);

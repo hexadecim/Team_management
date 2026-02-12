@@ -9,6 +9,7 @@ const projectRepository = require('../repository/projectRepository');
 const allocationRepository = require('../repository/allocationRepository');
 const employeeRepository = require('../repository/employeeRepository');
 const projectFinancialsRepository = require('../repository/projectFinancialsRepository');
+const projectBaselineRepository = require('../repository/projectBaselineRepository');
 
 class FinancialCalculationService {
     /**
@@ -59,7 +60,7 @@ class FinancialCalculationService {
         const totalProjectedProfit = totalProjectedBilling - totalProjectedExpense;
         const budgetVariance = plannedBudget - totalProjectedExpense;
 
-        console.log(`[Financials] Project ${projectId}: A=${A}, B=${B}, Total Billing=${totalProjectedBilling}`);
+        console.log(`[Financials] Project ${projectId}: A=${A}, B=${B}, Allocations=${projectAllocations.length}, Total Expense=${totalProjectedExpense}`);
 
         // Save summary to database
         const financialSummary = await projectFinancialsRepository.upsertProjectFinancials(projectId, {
@@ -76,8 +77,12 @@ class FinancialCalculationService {
         // Save monthly expense data
         await this._saveMonthlyExpenses(projectId, monthlyData);
 
+        // Check for active baseline
+        const activeBaseline = await projectBaselineRepository.getActiveBaseline(projectId);
+
         return {
             ...financialSummary,
+            activeBaseline,
             monthlyData
         };
     }
@@ -236,12 +241,20 @@ class FinancialCalculationService {
      * @returns {Promise<Object>} Financial summary
      */
     async getProjectFinancialSummary(projectId) {
-        const financials = await projectFinancialsRepository.getProjectFinancials(projectId);
-        if (!financials) {
-            // Calculate if not exists
+        let financials = await projectFinancialsRepository.getProjectFinancials(projectId);
+        const activeBaseline = await projectBaselineRepository.getActiveBaseline(projectId);
+
+        // If no record exists, or if the record exists but metrics are zero (likely initialized but not calculated)
+        // we trigger a calculation to ensure fresh data.
+        if (!financials || (parseFloat(financials.totalProjectedBilling) === 0 && parseFloat(financials.totalProjectedExpense) === 0)) {
+            console.log(`[Financials] No data or zero data for project ${projectId}. Triggering calculation.`);
             return await this.calculateProjectFinancials(projectId);
         }
-        return financials;
+
+        return {
+            ...financials,
+            activeBaseline
+        };
     }
 
     /**
@@ -280,6 +293,90 @@ class FinancialCalculationService {
         }
 
         return results;
+    }
+
+    /**
+     * Get baseline history for a project
+     * @param {string} projectId - Project ID
+     * @returns {Promise<Array>} Baseline history
+     */
+    async getProjectBaselines(projectId) {
+        return await projectBaselineRepository.getHistory(projectId);
+    }
+
+    /**
+     * Manually capture a new baseline for a project
+     * @param {string} projectId - Project ID
+     * @returns {Promise<Object>} New baseline
+     */
+    async createProjectBaseline(projectId) {
+        const project = await projectRepository.getById(projectId);
+        if (!project) throw new Error(`Project not found: ${projectId}`);
+
+        const financials = await this.calculateProjectFinancials(projectId);
+
+        return await projectBaselineRepository.createBaseline(projectId, {
+            baselineBilling: financials.totalProjectedBilling,
+            baselineExpense: financials.totalProjectedExpense,
+            baselineProfit: financials.totalProjectedProfit,
+            baselineMarginPct: financials.totalProjectedBilling > 0 ? (financials.totalProjectedProfit / financials.totalProjectedBilling) * 100 : 0,
+            baselineEndDate: project.end_date
+        });
+    }
+
+    /**
+     * Get bulk financials for all projects (optimized for dashboard)
+     * @returns {Promise<Object>} Object with data grouped by projectId
+     */
+    async getBulkFinancials() {
+        const [summaries, billings, expenses, baselines, allBaselineHistory] = await Promise.all([
+            projectFinancialsRepository.getAllProjectFinancials(),
+            projectFinancialsRepository.getAllMonthlyBilling(),
+            projectFinancialsRepository.getAllMonthlyExpenses(),
+            projectBaselineRepository.getAllActiveBaselines(),
+            projectBaselineRepository.getAllBaselines()
+        ]);
+
+        const bulkStore = {};
+
+        // Helper to initialize entry
+        const ensureEntry = (pid) => {
+            if (!bulkStore[pid]) {
+                bulkStore[pid] = { summary: null, billing: [], expenses: [], activeBaseline: null, baselineHistory: [] };
+            }
+        };
+
+        // Group summaries
+        summaries.forEach(s => {
+            ensureEntry(s.projectId);
+            bulkStore[s.projectId].summary = s;
+        });
+
+        // Group billings
+        billings.forEach(b => {
+            ensureEntry(b.projectId);
+            bulkStore[b.projectId].billing.push(b);
+        });
+
+        // Group expenses
+        expenses.forEach(e => {
+            ensureEntry(e.projectId);
+            bulkStore[e.projectId].expenses.push(e);
+        });
+
+        // Group baselines
+        baselines.forEach(base => {
+            ensureEntry(base.projectId);
+            bulkStore[base.projectId].activeBaseline = base;
+        });
+
+        // Group baseline history
+        allBaselineHistory.forEach(bh => {
+            ensureEntry(bh.projectId);
+            bulkStore[bh.projectId].baselineHistory.push(bh);
+        });
+
+        return bulkStore;
     }
 }
 
