@@ -247,6 +247,7 @@ function UserManager({ token, addToast }) {
                                                                         type="checkbox"
                                                                         checked={Array.isArray(editingUser.roles) && editingUser.roles.includes(r.name)}
                                                                         onChange={() => handleToggleEditingRole(r.name)}
+                                                                        style={{ width: 'auto' }}
                                                                     />
                                                                     {r.name}
                                                                 </label>
@@ -267,6 +268,7 @@ function UserManager({ token, addToast }) {
                                                                         type="checkbox"
                                                                         checked={Array.isArray(editingUser.project_ids) && editingUser.project_ids.includes(p.id)}
                                                                         onChange={() => handleToggleEditingProject(p.id)}
+                                                                        style={{ width: 'auto' }}
                                                                     />
                                                                     {p.name}
                                                                 </label>
@@ -330,6 +332,7 @@ function UserManager({ token, addToast }) {
                                             type="checkbox"
                                             checked={Array.isArray(newUser.project_ids) && newUser.project_ids.includes(p.id)}
                                             onChange={() => handleToggleNewUserProject(p.id)}
+                                            style={{ width: 'auto' }}
                                         />
                                         {p.name}
                                     </label>
@@ -339,13 +342,14 @@ function UserManager({ token, addToast }) {
                         </div>
                         <div className="input-group">
                             <label>Assign Roles</label>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem', maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '4px' }}>
                                 {Array.isArray(roles) && roles.map(r => (
-                                    <label key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <label key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                                         <input
                                             type="checkbox"
                                             checked={Array.isArray(newUser.roles) && newUser.roles.includes(r.name)}
                                             onChange={() => handleToggleNewUserRole(r.name)}
+                                            style={{ width: 'auto' }}
                                         />
                                         {r.name}
                                     </label>

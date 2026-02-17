@@ -20,8 +20,10 @@ const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation,
             const end = new Date(a.endDate);
 
             // We need to check if the allocation covers any part of the month
-            // Fiscal year starts Apr 2026
-            const monthYear = monthIndex < 9 ? 2026 : 2027; // Apr-Dec 2026, Jan-Mar 2027
+            // Fiscal year starts Apr
+            const now = new Date();
+            const currentFYStartYear = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+            const monthYear = monthIndex < 9 ? currentFYStartYear : currentFYStartYear + 1; // Apr-Dec, Jan-Mar
             const actualMonth = (monthIndex + 3) % 12; // 0=Apr -> 3 (Apr), 8=Dec -> 11 (Dec), 9=Jan -> 0 (Jan)
 
             const monthStart = new Date(monthYear, actualMonth, 1);

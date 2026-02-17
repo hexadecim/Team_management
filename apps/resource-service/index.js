@@ -95,12 +95,19 @@ const corsOptions = {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
+        // Allow localhost and specific domains
         if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.warn(`[CORS] Blocked request from origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
+            return callback(null, true);
         }
+
+        // Allow local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        const localNetworkRegex = /^http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/;
+        if (localNetworkRegex.test(origin)) {
+            return callback(null, true);
+        }
+
+        console.warn(`[CORS] Blocked request from origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     optionsSuccessStatus: 200,
@@ -199,25 +206,16 @@ const checkPermission = (module, level) => {
         const claims = req.user.claims || {};
         const userPerm = claims[module] || 'none';
 
-        if (level === 'rw' && userPerm !== 'rw') {
-            await AuditLogger.logSecurityEvent(
-                req.user.username,
-                'PERMISSION_DENIED',
-                'WARNING',
-                { module, requiredLevel: level, userLevel: userPerm, path: req.path }
-            );
-            return res.status(403).json({ error: `Forbidden: Requires write access to ${module}` });
-        }
-        if (level === 'r' && userPerm === 'none') {
-            await AuditLogger.logSecurityEvent(
-                req.user.username,
-                'PERMISSION_DENIED',
-                'WARNING',
-                { module, requiredLevel: level, userLevel: userPerm, path: req.path }
-            );
-            return res.status(403).json({ error: `Forbidden: Requires read access to ${module}` });
-        }
-        next();
+        if (userPerm === 'rw') return next();
+        if (level === 'r' && (userPerm === 'r' || userPerm === 'rw')) return next();
+
+        await AuditLogger.logSecurityEvent(
+            req.user.username,
+            'PERMISSION_DENIED',
+            'WARNING',
+            { module, requiredLevel: level, userLevel: userPerm, path: req.path }
+        );
+        return res.status(403).json({ error: `Forbidden: Requires ${level === 'rw' ? 'write' : 'read'} access to ${module}` });
     };
 };
 
@@ -661,6 +659,90 @@ app.delete('/employees/:id', authenticate, checkPermission('employee_list', 'rw'
         if (error.message && error.message.includes('Cannot delete employee')) {
             return res.status(400).send({ error: error.message });
         }
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// ============================================
+// ANALYTICS ENDPOINTS
+// ============================================
+
+const analyticsService = require('./services/analyticsService');
+
+app.get('/analytics/capacity/trend', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).send({ error: 'startDate and endDate are required' });
+        }
+        const data = await analyticsService.getUtilizationTrend(startDate, endDate);
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Trend Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.get('/analytics/capacity/stats', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const data = await analyticsService.getKeyStats();
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Stats Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.get('/analytics/capacity/bench', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const data = await analyticsService.getBenchStats(); // Defaults to today
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Bench Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.get('/analytics/capacity/risks', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const overAllocated = await analyticsService.getRiskRadar();
+        const rollingOff = await analyticsService.getRollingOffSoon();
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send({ overAllocated, rollingOff });
+    } catch (error) {
+        console.error('[Analytics Risks Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.get('/analytics/capacity/mix', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const data = await analyticsService.getCapacityMix();
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Mix Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// ============================================
+// FINANCIAL ANALYTICS ENDPOINTS
+// ============================================
+
+app.get('/analytics/financial/burn-trend', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).send({ error: 'startDate and endDate are required' });
+        }
+        const data = await analyticsService.getMonthlyBurnTrend(startDate, endDate);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Burn Trend Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });

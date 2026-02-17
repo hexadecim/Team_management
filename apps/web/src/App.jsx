@@ -24,13 +24,27 @@ const INITIAL_FORM = {
 
 // monthIndex 0 = Apr, 1 = May, ..., 11 = Mar
 const getMonthDates = (monthIndex) => {
-  const year = monthIndex < 9 ? 2026 : 2027;
-  const month = (monthIndex + 3) % 12;
-  const start = new Date(year, month, 1);
+  const now = new Date();
+  // If current month is Jan-Mar (0-2), we are in the FY that started last year.
+  // If current month is Apr-Dec (3-11), we are in the FY that started this year.
+  const currentFYStartYear = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+
+  const year = monthIndex < 9 ? currentFYStartYear : currentFYStartYear + 1;
+  const month = (monthIndex + 3) % 12; // 0-11 (Jan-Dec)
+
+  const isCurrentMonth = now.getMonth() === month && now.getFullYear() === year;
+
+  // If it's the current month, start from TODAY so allocation is active immediately
+  const start = new Date(year, month, isCurrentMonth ? now.getDate() : 1);
   const end = new Date(year, month + 1, 0);
 
-  const formatDate = (d) => d.toISOString().split('T')[0];
-  return { start: formatDate(start), end: formatDate(end) };
+  // Helper to account for timezone offset
+  const toLocalISO = (d) => {
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+  };
+
+  return { start: toLocalISO(start), end: toLocalISO(end) };
 };
 
 const INITIAL_ALLOCATION_FORM = {
@@ -392,7 +406,7 @@ function App() {
         </div>
 
         {view === 'capacity' && canView('capacity_analysis') && (
-          <CapacityDashboard employees={employees} allocations={allocations} />
+          <CapacityDashboard token={token} />
         )}
 
         {view === 'projects_analysis' && canView('project_analysis') && (

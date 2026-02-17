@@ -38,7 +38,7 @@ class ProjectRepository {
     }
 
     async update(id, project, username = 'system', changeReason = null) {
-        const { name, end_date, planned_budget, average_working_hours } = project;
+        const { name, end_date, planned_budget, average_working_hours, type } = project;
 
         try {
             // Begin transaction

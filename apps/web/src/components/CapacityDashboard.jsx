@@ -1,136 +1,114 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell
 } from 'recharts';
+import { API_BASE } from '../config';
+import BurnRateModal from './BurnRateModal';
 
-const CapacityDashboard = ({ employees, allocations }) => {
+const CapacityDashboard = ({ token }) => {
     const [range, setRange] = useState('Quarterly'); // Quarterly, Half-Yearly, Annual
     const [selectedSkill, setSelectedSkill] = useState(null);
-    const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Data States
+    const [trendData, setTrendData] = useState([]);
+    const [showBurnModal, setShowBurnModal] = useState(false);
+    const [benchStats, setBenchStats] = useState({ totalBench: 0, employees: [], chartData: [] });
+    const [risks, setRisks] = useState({ overAllocated: [], rollingOff: [] });
+    const [capacityMix, setCapacityMix] = useState({ totalCapacity: 0, allocatedCapacity: 0, mix: [] });
+
+    const [keyStats, setKeyStats] = useState({ totalEmployees: 0, billableEmployees: 0, benchEmployees: 0, benchBurn: 0 });
 
     const SKILL_COLORS = [
         '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
         '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#475569'
     ];
 
-    const chartData = useMemo(() => {
-        return months.map((m, idx) => {
-            const monthIndex = idx;
-            const year = monthIndex < 9 ? 2026 : 2027;
-            const actualMonth = (monthIndex + 3) % 12;
+    useEffect(() => {
+        fetchAllData();
 
-            const monthStart = new Date(year, actualMonth, 1);
-            const monthEnd = new Date(year, actualMonth + 1, 0);
+        // Polling for real-time updates (every 2 seconds)
+        const intervalId = setInterval(() => {
+            fetchAllData(true); // pass silence flag
+        }, 2000);
 
-            const totalAllocation = allocations.reduce((sum, a) => {
-                const aStart = new Date(a.startDate);
-                const aEnd = new Date(a.endDate);
-                if (aStart <= monthEnd && aEnd >= monthStart) {
-                    return sum + a.percentage;
-                }
-                return sum;
-            }, 0);
+        return () => clearInterval(intervalId);
+    }, [range]);
 
-            const avg = employees.length > 0 ? (totalAllocation / employees.length) : 0;
+    const fetchAllData = async (silent = false) => {
+        if (!silent) setLoading(true);
+        setError(null);
+        try {
+            await Promise.all([
+                fetchStats(),
+                fetchTrend(),
+                fetchBench(),
+                fetchRisks(),
+                fetchMix()
+            ]);
+        } catch (err) {
+            console.error(err);
+            setError('Failed to load dashboard data');
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    };
 
-            return {
-                name: m,
-                fullMonth: `${m} ${year}`,
-                utilization: Math.round(avg),
-                totalLoad: totalAllocation
-            };
+    const fetchStats = async () => {
+        const res = await fetch(`${API_BASE}/analytics/capacity/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-    }, [employees, allocations]);
+        if (res.ok) setKeyStats(await res.json());
+    };
 
-    const filteredData = useMemo(() => {
-        if (range === 'Quarterly') return chartData.slice(0, 3);
-        if (range === 'Half-Yearly') return chartData.slice(0, 6);
-        return chartData;
-    }, [chartData, range]);
+    const fetchTrend = async () => {
+        // Calculate dynamic dates based on range
+        const now = new Date();
+        const start = new Date(now);
+        const end = new Date(now);
 
-    const analytics = useMemo(() => {
-        const today = new Date('2026-04-01');
-        const thirtyDaysFromNow = new Date(today);
-        thirtyDaysFromNow.setDate(today.getDate() + 30);
+        if (range === 'Quarterly') {
+            end.setMonth(now.getMonth() + 3);
+        } else if (range === 'Half-Yearly') {
+            end.setMonth(now.getMonth() + 6);
+        } else {
+            end.setMonth(now.getMonth() + 12);
+        }
 
-        const currentMonthStart = new Date(2026, 3, 1);
-        const currentMonthEnd = new Date(2026, 4, 0);
+        // Adjust to start of current month and end of target month
+        start.setDate(1);
+        end.setMonth(end.getMonth() + 1, 0);
 
-        const bench = employees.filter(emp => {
-            const empAlloc = allocations.filter(a => {
-                const aStart = new Date(a.startDate);
-                const aEnd = new Date(a.endDate);
-                return a.employeeId === emp.id && aStart <= currentMonthEnd && aEnd >= currentMonthStart;
-            });
-            const total = empAlloc.reduce((sum, a) => sum + a.percentage, 0);
-            return total === 0;
+        const sStr = start.toISOString().split('T')[0];
+        const eStr = end.toISOString().split('T')[0];
+
+        const res = await fetch(`${API_BASE}/analytics/capacity/trend?startDate=${sStr}&endDate=${eStr}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (res.ok) setTrendData(await res.json());
+    };
 
-        const skillGroups = {};
-        bench.forEach(emp => {
-            const primarySkill = emp.primarySkills?.[0] || 'Unspecified';
-            if (!skillGroups[primarySkill]) {
-                skillGroups[primarySkill] = { skill: primarySkill, count: 0, employees: [] };
-            }
-            skillGroups[primarySkill].count++;
-            skillGroups[primarySkill].employees.push(emp);
+    const fetchBench = async () => {
+        const res = await fetch(`${API_BASE}/analytics/capacity/bench`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        const benchChartData = Object.values(skillGroups).sort((a, b) => b.count - a.count);
+        if (res.ok) setBenchStats(await res.json());
+    };
 
-        const upcomingAvailable = employees.filter(emp => {
-            const currentAllocations = allocations.filter(a => {
-                const aStart = new Date(a.startDate);
-                const aEnd = new Date(a.endDate);
-                return a.employeeId === emp.id && aStart <= currentMonthEnd && aEnd >= currentMonthStart;
-            });
-
-            if (currentAllocations.length === 0) return false;
-
-            const latestEnd = new Date(Math.max(...currentAllocations.map(a => new Date(a.endDate))));
-            return latestEnd <= thirtyDaysFromNow;
-        }).map(emp => {
-            const empAlloc = allocations.filter(a => a.employeeId === emp.id && new Date(a.startDate) <= currentMonthEnd && new Date(a.endDate) >= currentMonthStart);
-            const latestEnd = new Date(Math.max(...empAlloc.map(a => new Date(a.endDate))));
-            return { ...emp, availableFrom: latestEnd.toISOString().split('T')[0] };
+    const fetchRisks = async () => {
+        const res = await fetch(`${API_BASE}/analytics/capacity/risks`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (res.ok) setRisks(await res.json());
+    };
 
-        const overAllocated = employees.map(emp => {
-            const currentAlloc = allocations.filter(a => {
-                const aStart = new Date(a.startDate);
-                const aEnd = new Date(a.endDate);
-                return a.employeeId === emp.id && aStart <= currentMonthEnd && aEnd >= currentMonthStart;
-            });
-            const total = currentAlloc.reduce((sum, a) => sum + a.percentage, 0);
-            return { ...emp, totalLoad: total };
-        }).filter(emp => emp.totalLoad > 100);
-
-        const totalCapacity = employees.length * 100;
-        const allocatedCapacity = allocations.reduce((sum, a) => {
-            const aStart = new Date(a.startDate);
-            const aEnd = new Date(a.endDate);
-            if (aStart <= currentMonthEnd && aEnd >= currentMonthStart) {
-                return sum + a.percentage;
-            }
-            return sum;
-        }, 0);
-
-        const billableVsBench = [
-            { name: 'Billable (Allocated)', value: allocatedCapacity, color: '#6366f1' },
-            { name: 'Non-Billable (Bench)', value: Math.max(0, totalCapacity - allocatedCapacity), color: '#e2e8f0' }
-        ];
-
-        return {
-            headcount: employees.length,
-            avgUtil: chartData[0]?.utilization || 0,
-            bench: bench,
-            benchChartData,
-            upcomingAvailable,
-            overAllocated,
-            billableVsBench,
-            totalCapacity,
-            allocatedCapacity
-        };
-    }, [employees, allocations, chartData]);
+    const fetchMix = async () => {
+        const res = await fetch(`${API_BASE}/analytics/capacity/mix`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) setCapacityMix(await res.json());
+    };
 
     const handleBarClick = (data) => {
         if (data && data.activeLabel) {
@@ -142,40 +120,48 @@ const CapacityDashboard = ({ employees, allocations }) => {
 
     const selectedSkillEmployees = useMemo(() => {
         if (!selectedSkill) return [];
-        return analytics.benchChartData.find(d => d.skill === selectedSkill)?.employees || [];
-    }, [selectedSkill, analytics.benchChartData]);
+        return benchStats.chartData.find(d => d.skill === selectedSkill)?.employees || [];
+    }, [selectedSkill, benchStats]);
+
+    if (loading && !trendData.length) {
+        return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading capacity data...</div>;
+    }
+
+    if (error) {
+        return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--col-danger)' }}>{error}</div>;
+    }
 
     return (
         <div className="dashboard-view">
             <div className="dashboard-grid">
                 <div className="metric-card">
-                    <div className="metric-label">Avg Allocation (Apr)</div>
-                    <div className="metric-value">{analytics.avgUtil}%</div>
+                    <div className="metric-label">Total Employees</div>
+                    <div className="metric-value">{keyStats.totalEmployees}</div>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                        {analytics.allocatedCapacity} / {analytics.totalCapacity} total units
+                        Total Headcount
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">Current Bench</div>
-                    <div className="metric-value">{analytics.bench.length}</div>
+                    <div className="metric-label">Billable (Allocated)</div>
+                    <div className="metric-value" style={{ color: '#6366f1' }}>{keyStats.billableEmployees}</div>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                        {Math.round((analytics.bench.length / analytics.headcount) * 100)}% of workforce
+                        {keyStats.totalEmployees > 0 ? Math.round((keyStats.billableEmployees / keyStats.totalEmployees) * 100) : 0}% Utilization
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">At Risk (Over-allocated)</div>
-                    <div className="metric-value" style={{ color: analytics.overAllocated.length > 0 ? 'var(--col-danger)' : 'inherit' }}>
-                        {analytics.overAllocated.length}
-                    </div>
+                    <div className="metric-label">Bench (Unassigned)</div>
+                    <div className="metric-value" style={{ color: '#eab308' }}>{keyStats.benchEmployees}</div>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                        Load exceeding 100% capacity
+                        No Active Project
                     </div>
                 </div>
-                <div className="metric-card">
-                    <div className="metric-label">Pipeline (Soon to Bench)</div>
-                    <div className="metric-value" style={{ color: '#f59e0b' }}>{analytics.upcomingAvailable.length}</div>
+                <div className="metric-card" onClick={() => setShowBurnModal(true)} style={{ cursor: 'pointer' }}>
+                    <div className="metric-label">Bench Cost Burn</div>
+                    <div className="metric-value" style={{ color: '#ef4444' }}>
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(keyStats.benchBurn || 0)}
+                    </div>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                        Becoming available in 30 days
+                        Monthly Unallocated Cost
                     </div>
                 </div>
             </div>
@@ -198,7 +184,7 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     </div>
                     <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
-                            <LineChart data={filteredData}>
+                            <LineChart data={trendData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} dy={10} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} unit="%" />
@@ -213,12 +199,12 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>Capacity Mix</h2>
                     <div style={{ width: '100%', height: 250, position: 'relative' }}>
                         <ResponsiveContainer>
-                            <BarChart layout="vertical" data={analytics.billableVsBench}>
+                            <BarChart layout="vertical" data={capacityMix.mix}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                 <Tooltip cursor={{ fill: 'transparent' }} />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={30}>
-                                    {analytics.billableVsBench.map((entry, index) => (
+                                    {capacityMix.mix && capacityMix.mix.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Bar>
@@ -227,7 +213,7 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     </div>
                     <div style={{ marginTop: '1rem', textAlign: 'center' }}>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Currently operating at <strong>{analytics.avgUtil}%</strong> total capacity
+                            Currently operating at <strong>{Math.round((capacityMix.allocatedCapacity / (capacityMix.totalCapacity || 1)) * 100)}%</strong> total capacity
                         </p>
                     </div>
                 </div>
@@ -235,19 +221,19 @@ const CapacityDashboard = ({ employees, allocations }) => {
 
             <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>Bench Distribution by Skill</h2>
-                {analytics.benchChartData.length === 0 ? (
+                {benchStats.chartData.length === 0 ? (
                     <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No employees on bench for current month.</p>
                 ) : (
                     <>
                         <div style={{ width: '100%', height: 250 }}>
                             <ResponsiveContainer>
-                                <BarChart data={analytics.benchChartData} onClick={handleBarClick}>
+                                <BarChart data={benchStats.chartData} onClick={handleBarClick}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="skill" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} dy={10} interval={0} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} allowDecimals={false} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }} />
                                     <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={50}>
-                                        {analytics.benchChartData.map((entry, index) => (
+                                        {benchStats.chartData.map((entry, index) => (
                                             <Cell key={`cell-bench-${index}`} fill={SKILL_COLORS[index % SKILL_COLORS.length]} fillOpacity={selectedSkill === entry.skill ? 1 : 0.7} />
                                         ))}
                                     </Bar>
@@ -259,7 +245,7 @@ const CapacityDashboard = ({ employees, allocations }) => {
                             <div className="bench-section" style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800 }}>
-                                        Employees with <span style={{ color: SKILL_COLORS[analytics.benchChartData.findIndex(d => d.skill === selectedSkill) % SKILL_COLORS.length] }}>{selectedSkill}</span> skill
+                                        Employees with <span style={{ color: SKILL_COLORS[benchStats.chartData.findIndex(d => d.skill === selectedSkill) % SKILL_COLORS.length] }}>{selectedSkill}</span> skill
                                     </h3>
                                     <button onClick={() => setSelectedSkill(null)} style={{ background: 'none', border: 'none', color: 'var(--col-primary)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 700 }}>&times; Close List</button>
                                 </div>
@@ -285,11 +271,11 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: 'var(--col-danger)' }}>
                         ⚠️ Risk Radar: Over-allocated
                     </h2>
-                    {analytics.overAllocated.length === 0 ? (
+                    {risks.overAllocated.length === 0 ? (
                         <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No over-allocation risks detected.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {analytics.overAllocated.map(emp => (
+                            {risks.overAllocated.map(emp => (
                                 <div key={emp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#fff1f2', borderRadius: '8px', border: '1px solid #ffe4e6' }}>
                                     <div>
                                         <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{emp.firstName} {emp.lastName}</div>
@@ -309,11 +295,11 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: '#f59e0b' }}>
                         🔮 Foresight: Rolling Off Soon
                     </h2>
-                    {analytics.upcomingAvailable.length === 0 ? (
+                    {risks.rollingOff.length === 0 ? (
                         <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No employees rolling off in the next 30 days.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {analytics.upcomingAvailable.map(emp => (
+                            {risks.rollingOff.map(emp => (
                                 <div key={emp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
                                     <div>
                                         <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{emp.firstName} {emp.lastName}</div>
@@ -329,6 +315,8 @@ const CapacityDashboard = ({ employees, allocations }) => {
                     )}
                 </div>
             </div>
+
+            {showBurnModal && <BurnRateModal token={token} onClose={() => setShowBurnModal(false)} />}
         </div>
     );
 };
