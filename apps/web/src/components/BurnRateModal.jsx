@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { API_BASE } from '../config';
 
@@ -153,7 +153,13 @@ const BurnRateModal = ({ token, onClose }) => {
                 ) : (
                     <div style={{ height: 400, width: '100%' }}>
                         <ResponsiveContainer>
-                            <BarChart data={data}>
+                            <AreaChart data={data}>
+                                <defs>
+                                    <linearGradient id="colorBurn" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
+                                    </linearGradient>
+                                </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }} dy={10} />
                                 <YAxis
@@ -163,16 +169,18 @@ const BurnRateModal = ({ token, onClose }) => {
                                     tickFormatter={(value) => `$${value / 1000}k`}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'transparent' }}
+                                    cursor={{ stroke: '#ef4444', strokeWidth: 1, strokeDasharray: '3 3' }}
                                     formatter={(value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                                 />
-                                <Bar dataKey="burnRate" radius={[4, 4, 0, 0]} barSize={40}>
-                                    {data.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.burnRate > 150000 ? '#ef4444' : '#f87171'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
+                                <Area
+                                    type="monotone"
+                                    dataKey="burnRate"
+                                    stackId="1"
+                                    stroke="#ef4444"
+                                    fill="url(#colorBurn)"
+                                />
+                            </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 )}

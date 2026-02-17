@@ -49,6 +49,7 @@ class AnalyticsService {
             name: row.name,
             fullMonth: row.fullMonth,
             year: parseInt(row.year),
+            month: parseInt(row.month_num),
             utilization: parseInt(row.utilization) || 0,
             totalLoad: 0, // Not tracking percentage load in this simple model yet
             headcount: parseInt(row.headcount) || 0

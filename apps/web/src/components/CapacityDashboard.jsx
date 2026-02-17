@@ -6,7 +6,6 @@ import { API_BASE } from '../config';
 import BurnRateModal from './BurnRateModal';
 
 const CapacityDashboard = ({ token }) => {
-    const [range, setRange] = useState('Quarterly'); // Quarterly, Half-Yearly, Annual
     const [selectedSkill, setSelectedSkill] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -34,7 +33,7 @@ const CapacityDashboard = ({ token }) => {
         }, 2000);
 
         return () => clearInterval(intervalId);
-    }, [range]);
+    }, []);
 
     const fetchAllData = async (silent = false) => {
         if (!silent) setLoading(true);
@@ -63,30 +62,58 @@ const CapacityDashboard = ({ token }) => {
     };
 
     const fetchTrend = async () => {
-        // Calculate dynamic dates based on range
+        // 1. Determine Fiscal Year (Apr - Mar)
         const now = new Date();
-        const start = new Date(now);
-        const end = new Date(now);
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-11
 
-        if (range === 'Quarterly') {
-            end.setMonth(now.getMonth() + 3);
-        } else if (range === 'Half-Yearly') {
-            end.setMonth(now.getMonth() + 6);
-        } else {
-            end.setMonth(now.getMonth() + 12);
-        }
+        // If Jan-Mar (0-2), we are in previous year's FY (e.g., Feb 2026 -> FY 2025-26)
+        // If Apr-Dec (3-11), we are in current year's FY (e.g., Apr 2026 -> FY 2026-27)
+        const startYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+        const endYear = startYear + 1;
 
-        // Adjust to start of current month and end of target month
-        start.setDate(1);
-        end.setMonth(end.getMonth() + 1, 0);
+        const startDate = `${startYear}-04-01`;
+        const endDate = `${endYear}-03-31`;
 
-        const sStr = start.toISOString().split('T')[0];
-        const eStr = end.toISOString().split('T')[0];
-
-        const res = await fetch(`${API_BASE}/analytics/capacity/trend?startDate=${sStr}&endDate=${eStr}`, {
+        const res = await fetch(`${API_BASE}/analytics/capacity/trend?startDate=${startDate}&endDate=${endDate}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (res.ok) setTrendData(await res.json());
+
+        if (res.ok) {
+            const rawData = await res.json();
+            const processed = processTrendData(rawData, startYear);
+            setTrendData(processed);
+        }
+    };
+
+    const processTrendData = (rawData, startYear) => {
+        // Helper to map month string to index (April=0, ..., March=11)
+        const monthMap = {};
+        rawData.forEach(item => {
+
+            // Construct key YYYY-MM (pad month)
+            // We can infer month number from the data if available or date parsing
+            // The backend service `getUtilizationTrend` returns `year` and `month` (added in our previous plan? No, let's check service)
+            // AnalyticsService returns: name ("Apr"), fullMonth, year, utilization.
+            // We need to map this to our buckets.
+
+            // Let's iterate and find matches:
+            const key = `${item.year}-${String(new Date(Date.parse(item.fullMonth)).getMonth() + 1).padStart(2, '0')}`;
+            monthMap[key] = item.utilization || 0;
+        });
+
+        // Define the 12 buckets for the Fiscal Year
+        const months = [
+            { key: `${startYear}-04`, label: 'Apr' }, { key: `${startYear}-05`, label: 'May' }, { key: `${startYear}-06`, label: 'Jun' },
+            { key: `${startYear}-07`, label: 'Jul' }, { key: `${startYear}-08`, label: 'Aug' }, { key: `${startYear}-09`, label: 'Sep' },
+            { key: `${startYear}-10`, label: 'Oct' }, { key: `${startYear}-11`, label: 'Nov' }, { key: `${startYear}-12`, label: 'Dec' },
+            { key: `${startYear + 1}-01`, label: 'Jan' }, { key: `${startYear + 1}-02`, label: 'Feb' }, { key: `${startYear + 1}-03`, label: 'Mar' }
+        ];
+
+        return months.map(m => ({
+            name: m.label,
+            utilization: monthMap[m.key] || 0
+        }));
     };
 
     const fetchBench = async () => {
@@ -169,18 +196,7 @@ const CapacityDashboard = ({ token }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="chart-container">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase' }}>Utilization Trend</h2>
-                        <div className="toggle-group">
-                            {['Quarterly', 'Half-Yearly', 'Annual'].map(r => (
-                                <button
-                                    key={r}
-                                    className={`toggle-btn ${range === r ? 'active' : ''}`}
-                                    onClick={() => setRange(r)}
-                                >
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase' }}>Monthly Utilization Trend</h2>
                     </div>
                     <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
