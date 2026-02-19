@@ -42,6 +42,26 @@
   --col-warning: var(--bw-orange);
   --col-danger: var(--bw-vermilion);
   --col-info: var(--sky-600);
+
+  /* Option B: Pastel Palette (Project Colors) */
+  --pastel-1: #FFD1DC;
+  /* Light Pink */
+  --pastel-2: #FFDFD3;
+  /* Peach */
+  --pastel-3: #FFFFBA;
+  /* Light Yellow */
+  --pastel-4: #BAFFC9;
+  /* Mint Green */
+  --pastel-5: #BAE1FF;
+  /* Light Blue */
+  --pastel-6: #E2F0CB;
+  /* Tea Green */
+  --pastel-7: #FFDAC1;
+  /* Apricot */
+  --pastel-8: #C7CEEA;
+  /* Periwinkle */
+  --pastel-txt: #475569;
+  /* Slate 600 for contrast */
 }
 
 [data-theme='dark'] {
@@ -641,73 +661,133 @@ tr:hover {
   padding: 0.75rem 1.5rem;
 }
 
-/* Calendar Grid */
+/* Calendar Grid - Option C: Pro Data Table */
 .calendar-view {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 4px;
-  overflow: hidden;
+  background: var(--card-bg);
   margin-top: 1rem;
+  overflow: hidden;
+  /* Contain children */
+  gap: 0;
+  /* Remove gap from previous option */
 }
 
 .calendar-header {
   display: grid;
   grid-template-columns: 200px repeat(12, 1fr);
-  background: var(--fg);
-  color: var(--bg);
-  font-size: 0.65rem;
-  font-weight: 700;
+  background: #f8fafc;
+  /* Light gray header */
+  color: var(--sidebar-fg-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
   text-align: center;
+  padding: 0;
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-bottom: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .calendar-header-cell {
-  padding: 0.5rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.calendar-row {
-  display: grid;
-  grid-template-columns: 200px repeat(12, 1fr);
-  border-bottom: 1px solid var(--border);
-  min-height: 50px;
-}
-
-.employee-cell {
-  padding: 1rem;
-  font-weight: 700;
-  font-size: 0.8rem;
-  background: var(--muted);
-  border-right: 1px solid var(--border);
-}
-
-.day-cell {
-  border-right: 1px solid var(--border);
-  position: relative;
-}
-
-/* Heat-map intensities */
-.allocation-bar {
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  border-radius: 2px;
+  padding: 0.75rem 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 0.6rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 0.2s;
-  z-index: 5;
+  border-right: 1px solid var(--border);
+  background: #f8fafc;
+  /* Match header bg */
 }
 
-.allocation-bar:hover {
-  transform: scaleY(1.1);
-  z-index: 10;
+/* The Table Row */
+.calendar-row {
+  display: grid;
+  grid-template-columns: 200px repeat(12, 1fr);
+  background: var(--card-bg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  min-height: 40px;
+  /* Compact height */
+  align-items: stretch;
+  /* Full height cells */
+  transition: background-color 0.1s;
+  box-shadow: none;
+}
+
+/* Zebra Striping */
+.calendar-row:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.calendar-row:hover {
+  background-color: #f1f5f9;
+  /* Highlight on hover */
+  transform: none;
+  box-shadow: none;
+  border-color: transparent;
+  z-index: 1;
+}
+
+.employee-cell {
+  padding: 0 1rem;
+  /* Compact padding */
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--fg);
+  background: transparent;
+  border-right: 2px solid var(--border);
+  /* Distinct divider */
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.day-cell {
+  position: relative;
+  height: 100%;
+  border-right: 1px solid var(--border);
+  /* Solid grid lines */
+}
+
+.day-cell:last-child {
+  border-right: none;
+}
+
+/* Heat-map intensities */
+/* Dense Allocation Pill */
+.allocation-bar {
+  position: absolute;
+  top: 6px;
+  /* Tighter vertical spacing */
+  bottom: 6px;
+  left: 1px;
+  right: 1px;
+  border-radius: 4px;
+  /* Slightly less rounded */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pastel-txt);
+  font-size: 0.65rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  z-index: 5;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  /* Subtle definition */
+  box-shadow: none;
 }
 
 /* Colors based on percentage (heatmap vibe) */
@@ -1169,4 +1249,48 @@ tr:hover {
 
 .info-box strong {
   font-weight: 600;
+}
+
+/* Animations */
+@keyframes scaleInLeft {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-growth {
+  transform-origin: left;
+  animation: scaleInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Smooth ease-out */
+}
+
+.animate-pop-in {
+  animation: popIn 0.2s ease-out forwards;
+}
+
+/* Enhanced Interactions */
+.allocation-bar {
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s !important;
+}
+
+.allocation-bar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
 }

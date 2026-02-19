@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { API_BASE } from '../config';
 
-const BurnRateModal = ({ token, onClose }) => {
+const BurnRateModal = ({ token, onClose, formatCurrency }) => {
     const [range, setRange] = useState('Annual');
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -166,11 +166,11 @@ const BurnRateModal = ({ token, onClose }) => {
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }}
-                                    tickFormatter={(value) => `$${value / 1000}k`}
+                                    tickFormatter={(value) => value >= 1000 ? `${formatCurrency(value / 1000)}k` : formatCurrency(value)}
                                 />
                                 <Tooltip
                                     cursor={{ stroke: '#ef4444', strokeWidth: 1, strokeDasharray: '3 3' }}
-                                    formatter={(value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
+                                    formatter={(value) => formatCurrency(value)}
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                                 />
                                 <Area

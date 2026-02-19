@@ -13,7 +13,7 @@ const INITIAL_FORM = {
     allocation: 0
 };
 
-function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees: allEmployees, projects, onRefresh }) {
+const EmployeeManager = ({ token, canEdit, addToast, fetchAllocations, employees: allEmployees, projects, onRefresh, formatCurrency }) => {
     const [search, setSearch] = useState('');
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [formData, setFormData] = useState(INITIAL_FORM);
@@ -201,12 +201,13 @@ function EmployeeManager({ token, canEdit, addToast, fetchAllocations, employees
                                             Master: {emp.currentProject}
                                         </div>
                                     )}
-                                </td>
-                                <td>
-                                    <div style={{ fontSize: '0.85rem' }}>
-                                        <span style={{ color: 'var(--col-success)', fontWeight: 700 }}>${emp.billableRate}</span>
-                                        <span style={{ margin: '0 0.3rem', opacity: 0.3 }}>/</span>
-                                        <span style={{ color: 'var(--col-danger)', fontWeight: 700 }}>${emp.expenseRate}</span>
+                                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                            Billable: <span style={{ color: 'var(--col-success)', fontWeight: 700 }}>{formatCurrency(emp.billableRate)}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                            Expense: <span style={{ color: 'var(--col-danger)', fontWeight: 700 }}>{formatCurrency(emp.expenseRate)}</span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td>

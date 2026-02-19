@@ -10,6 +10,8 @@ import Logo from './components/Logo';
 import EmployeeManager from './components/EmployeeManager';
 import Sidebar from './components/Sidebar';
 import SMTPConfig from './components/SMTPConfig';
+import FinancialYearManager from './components/FinancialYearManager';
+import SystemSettings from './components/SystemSettings';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { API_BASE } from './config';
 
@@ -23,19 +25,24 @@ const INITIAL_FORM = {
 };
 
 // monthIndex 0 = Apr, 1 = May, ..., 11 = Mar
-const getMonthDates = (monthIndex) => {
+const getMonthDates = (monthIndex, fyStartDateStr) => {
   const now = new Date();
-  // If current month is Jan-Mar (0-2), we are in the FY that started last year.
-  // If current month is Apr-Dec (3-11), we are in the FY that started this year.
-  const currentFYStartYear = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
 
-  const year = monthIndex < 9 ? currentFYStartYear : currentFYStartYear + 1;
+  // Parse fyStartDate or fallback to current FY logic
+  let startYear;
+  if (fyStartDateStr) {
+    startYear = new Date(fyStartDateStr).getFullYear();
+  } else {
+    startYear = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+  }
+
+  const year = monthIndex < 9 ? startYear : startYear + 1;
   const month = (monthIndex + 3) % 12; // 0-11 (Jan-Dec)
 
   const isCurrentMonth = now.getMonth() === month && now.getFullYear() === year;
 
   // If it's the current month, start from TODAY so allocation is active immediately
-  const start = new Date(year, month, isCurrentMonth ? now.getDate() : 1);
+  const start = new Date(year, month, isCurrentMonth ? Math.min(now.getDate(), 20) : 1); // Cap start at 20th if it's current month
   const end = new Date(year, month + 1, 0);
 
   // Helper to account for timezone offset
@@ -45,6 +52,11 @@ const getMonthDates = (monthIndex) => {
   };
 
   return { start: toLocalISO(start), end: toLocalISO(end) };
+};
+
+const getCurrentMonthIndex = () => {
+  // Apr=0, ..., Mar=11
+  return (new Date().getMonth() + 9) % 12;
 };
 
 const INITIAL_ALLOCATION_FORM = {
@@ -65,7 +77,7 @@ const decodeToken = (token) => {
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('vibe-token'));
-  const [claims, setClaims] = useState(token ? decodeToken(token)?.claims : {});
+  const [claims, setClaims] = useState(token ? (decodeToken(token)?.claims || {}) : {});
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -85,6 +97,18 @@ function App() {
   const [isAllocPanelOpen, setIsAllocPanelOpen] = useState(false);
   const [allocData, setAllocData] = useState(INITIAL_ALLOCATION_FORM);
   const [toasts, setToasts] = useState([]);
+
+  // Financial Year State
+  const [financialYears, setFinancialYears] = useState([]);
+  const [selectedFY, setSelectedFY] = useState(null);
+
+  // Partial Delete State
+  const [isPartialDeleteModalOpen, setIsPartialDeleteModalOpen] = useState(false);
+  const [allocationToPartialDelete, setAllocationToPartialDelete] = useState(null);
+  const [partialDeleteDates, setPartialDeleteDates] = useState({ start: '', end: '' });
+
+  // System Settings
+  const [systemSettings, setSystemSettings] = useState({ currency: 'USD' });
 
   // Edit/Delete state
   const [isEditMode, setIsEditMode] = useState(false);
@@ -138,7 +162,8 @@ function App() {
         localStorage.setItem('vibe-token', data.accessToken);
         localStorage.setItem('vibe-refresh-token', data.refreshToken);
         setToken(data.accessToken);
-        setClaims(decodeToken(data.accessToken).claims);
+        const decoded = decodeToken(data.accessToken);
+        setClaims(decoded ? decoded.claims : {});
         addToast('Welcome back!', 'success');
       } else {
         const error = await res.json();
@@ -155,19 +180,11 @@ function App() {
   useEffect(() => {
     if (!token) return;
 
-    // Initial fetch
-    fetchEmployees();
-    fetchProjects();
     fetchAllocations();
-
-    // Polling interval (2 seconds)
-    const interval = setInterval(() => {
-      fetchEmployees();
-      fetchProjects();
-      fetchAllocations();
-    }, 30000);
-
-    return () => clearInterval(interval);
+    fetchProjects();
+    fetchEmployees();
+    fetchFinancialYears();
+    fetchSettings();
   }, [token]);
 
   const canView = (permission) => {
@@ -204,8 +221,50 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
-  const handleOpenAllocPanel = (employee = null, monthIdx = 0) => {
-    const dates = getMonthDates(monthIdx);
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/settings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setSystemSettings(await res.json());
+    } catch (err) { console.error(err); }
+  };
+
+  const formatCurrency = (amount, maximumFractionDigits = 0) => {
+    const currency = systemSettings.currency || 'USD';
+    const mapping = {
+      'USD': { locale: 'en-US', currency: 'USD' },
+      'INR': { locale: 'en-IN', currency: 'INR' },
+      'EUR': { locale: 'de-DE', currency: 'EUR' }
+    };
+    const { locale, currency: currCode } = mapping[currency] || mapping.USD;
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currCode,
+      maximumFractionDigits
+    }).format(amount || 0);
+  };
+
+  const fetchFinancialYears = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/financial-years`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFinancialYears(data);
+        const current = data.find(fy => fy.isCurrent);
+        if (current && !selectedFY) {
+          setSelectedFY(current);
+        }
+      }
+    } catch (err) {
+      console.error('Fetch FY failed:', err);
+    }
+  };
+
+  const handleOpenAllocPanel = (employee = null, monthIdx = getCurrentMonthIndex()) => {
+    const dates = getMonthDates(monthIdx, selectedFY?.startDate);
     setAllocData({
       ...INITIAL_ALLOCATION_FORM,
       employeeId: employee ? employee.id : '',
@@ -237,37 +296,64 @@ function App() {
     setIsAllocPanelOpen(true);
   };
 
-  const handleDeleteAllocation = async (allocationId) => {
-    if (!window.confirm('Are you sure you want to delete this allocation?')) {
-      return;
-    }
+  const handleDeleteAllocation = (allocation) => {
+    setAllocationToPartialDelete(allocation);
+    setPartialDeleteDates({ start: allocation.startDate, end: allocation.endDate });
+    setIsPartialDeleteModalOpen(true);
+  };
+
+  const handleConfirmDeleteFull = async () => {
+    if (!allocationToPartialDelete) return;
+    if (!window.confirm('Delete FULL allocation?')) return;
 
     try {
-      const res = await fetch(`${API_BASE}/allocations/${allocationId}`, {
+      const res = await fetch(`${API_BASE}/allocations/${allocationToPartialDelete.id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!res.ok) {
-        addToast('Failed to delete allocation', 'error');
-        return;
-      }
-
-      addToast('Allocation deleted successfully', 'success');
-      fetchAllocations();
-      fetchEmployees();
-
-      // Close the list modal if no more allocations
-      const remainingAllocations = selectedMonthAllocations.filter(a => a.id !== allocationId);
-      if (remainingAllocations.length === 0) {
+      if (res.ok) {
+        addToast('Allocation deleted successfully', 'success');
+        fetchAllocations();
+        setIsPartialDeleteModalOpen(false);
         setIsAllocationListOpen(false);
       } else {
-        setSelectedMonthAllocations(remainingAllocations);
+        addToast('Failed to delete allocation', 'error');
       }
     } catch (err) {
+      console.error(err);
       addToast('Error deleting allocation', 'error');
+    }
+  };
+
+  const handleConfirmDeletePartial = async () => {
+    if (!allocationToPartialDelete) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/allocations/${allocationToPartialDelete.id}/partial-delete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate: partialDeleteDates.start,
+          endDate: partialDeleteDates.end
+        })
+      });
+
+      if (res.ok) {
+        addToast('Allocation period deleted', 'success');
+        fetchAllocations();
+        setIsPartialDeleteModalOpen(false);
+        setIsAllocationListOpen(false);
+      } else {
+        const error = await res.json();
+        addToast(error.error || 'Failed to delete period', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('Error deleting period', 'error');
     }
   };
 
@@ -394,7 +480,7 @@ function App() {
               view === 'projects_analysis' ? 'Project Analysis' :
                 view === 'employees' ? 'Resource Management' :
                   view === 'allocation' ? 'Planning Board' :
-                    view === 'admin' ? 'Administration' : 'Resource Hub'}
+                    view === 'admin' ? 'Administration' : 'Dashboard'}
           </h1>
           <p className="page-description">
             {view === 'capacity' ? 'Analyze resource loading, utilization trends, and availability.' :
@@ -406,11 +492,11 @@ function App() {
         </div>
 
         {view === 'capacity' && canView('capacity_analysis') && (
-          <CapacityDashboard token={token} />
+          <CapacityDashboard token={token} formatCurrency={formatCurrency} />
         )}
 
         {view === 'projects_analysis' && canView('project_analysis') && (
-          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} />
+          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} formatCurrency={formatCurrency} systemSettings={systemSettings} />
         )}
 
         {view === 'admin' && canView('administration') && (
@@ -437,11 +523,27 @@ function App() {
               >
                 Email Settings
               </div>
+              <div
+                className={`tab ${adminView === 'fy' ? 'active' : ''}`}
+                onClick={() => setAdminView('fy')}
+                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+              >
+                Financial Years
+              </div>
+              <div
+                className={`tab ${adminView === 'settings' ? 'active' : ''}`}
+                onClick={() => setAdminView('settings')}
+                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+              >
+                Currency Settings
+              </div>
             </div>
 
             {adminView === 'users' && <UserManager token={token} addToast={addToast} />}
             {adminView === 'roles' && <RoleManager token={token} addToast={addToast} />}
             {adminView === 'smtp' && <SMTPConfig token={token} addToast={addToast} />}
+            {adminView === 'fy' && <FinancialYearManager token={token} addToast={addToast} onFYChange={setFinancialYears} />}
+            {adminView === 'settings' && <SystemSettings token={token} addToast={addToast} settings={systemSettings} onSettingsChange={fetchSettings} />}
           </div>
         )}
 
@@ -475,6 +577,7 @@ function App() {
                 projects={projects}
                 onRefresh={fetchEmployees}
                 fetchAllocations={fetchAllocations}
+                formatCurrency={formatCurrency}
               />
             )}
 
@@ -495,6 +598,9 @@ function App() {
               employees={employees}
               allocations={allocations}
               projects={projects}
+              selectedFY={selectedFY}
+              onFYChange={setSelectedFY}
+              allFYs={financialYears}
               onAddAllocation={canEdit('allocation') ? handleOpenAllocPanel : undefined}
               onShowAllocationList={canView('allocation') ? handleShowAllocationList : undefined}
             />
@@ -579,7 +685,7 @@ function App() {
                     }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                          {project ? project.name : 'Unknown Project'}
+                          {(project && project.name && project.name.length > 0) ? project.name.charAt(0).toUpperCase() + project.name.slice(1) : 'Unknown Project'}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)' }}>
                           {allocation.percentage}% • {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
@@ -595,7 +701,7 @@ function App() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteAllocation(allocation.id)}
+                            onClick={() => handleDeleteAllocation(allocation)}
                             className="action-btn"
                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--col-danger)', color: 'white' }}
                           >
@@ -613,7 +719,7 @@ function App() {
               <button
                 onClick={() => {
                   setIsAllocationListOpen(false);
-                  handleOpenAllocPanel(selectedEmployee, 0);
+                  handleOpenAllocPanel(selectedEmployee, getCurrentMonthIndex());
                 }}
                 className="action-btn"
                 style={{ width: '100%', marginTop: '1.5rem' }}
@@ -621,6 +727,64 @@ function App() {
                 + Add New Allocation
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Partial Delete Modal */}
+        <div className={`overlay ${isPartialDeleteModalOpen ? 'open' : ''}`} onClick={() => setIsPartialDeleteModalOpen(false)}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', padding: '2rem' }}>
+            <h2 style={{ margin: 0, marginBottom: '1.5rem' }}>Delete Allocation</h2>
+            <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem', color: 'var(--muted-fg)' }}>
+              Choose to delete the entire project allocation or only for a specific period.
+            </p>
+
+            <div style={{ marginBottom: '2rem', padding: '1rem', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--col-primary)', marginBottom: '1rem' }}>DELETE FOR PERIOD</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'flex-end' }}>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.75rem' }}>From</label>
+                  <input
+                    type="date"
+                    value={partialDeleteDates.start}
+                    onChange={e => setPartialDeleteDates({ ...partialDeleteDates, start: e.target.value })}
+                    style={{ padding: '0.3rem' }}
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.75rem' }}>To</label>
+                  <input
+                    type="date"
+                    value={partialDeleteDates.end}
+                    onChange={e => setPartialDeleteDates({ ...partialDeleteDates, end: e.target.value })}
+                    style={{ padding: '0.3rem' }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleConfirmDeletePartial}
+                className="action-btn"
+                style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem', background: 'var(--col-warning)', color: '#000' }}
+              >
+                Delete Selected Period
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                className="action-btn"
+                style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
+                onClick={() => setIsPartialDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="action-btn"
+                style={{ flex: 1, background: 'var(--col-danger)' }}
+                onClick={handleConfirmDeleteFull}
+              >
+                Delete Full Allocation
+              </button>
+            </div>
           </div>
         </div>
 

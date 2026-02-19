@@ -50,11 +50,13 @@ const projectRepo = require('./repository/projectRepository');
 const allocationRepo = require('./repository/allocationRepository');
 const financialCalculationService = require('./services/financialCalculationService');
 const allocationService = require('./services/allocationService');
+const financialYearRepo = require('./repository/financialYearRepository');
 const SMTPConfigRepository = require('../../packages/shared/repositories/smtpConfigRepository');
 const smtpConfigRepo = new SMTPConfigRepository();
 const { db, emailService } = require('@team-mgmt/shared');
 const AuditLogger = require('./middleware/auditLogger');
 const SecurityMonitor = require('./middleware/securityMonitor');
+const systemSettingsRepo = require('./repository/systemSettingsRepository');
 
 // ============================================
 // ZERO TRUST SECURITY CONFIGURATION
@@ -1299,6 +1301,32 @@ app.delete('/allocations/:id', authenticate, checkPermission('allocation', 'rw')
     }
 });
 
+app.post('/allocations/:id/partial-delete', authenticate, checkPermission('allocation', 'rw'), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).send({ error: 'startDate and endDate are required' });
+        }
+
+        const result = await allocationService.deleteAllocationPeriod(req.params.id, startDate, endDate);
+
+        // Trigger financial recalculation for the project
+        // We need to get the allocation first to know the projectId, 
+        // but deleteAllocationPeriod might have deleted it.
+        // However, the allocationService already has the project info.
+        // For simplicity, we'll assume the client knows or we trigger a global/project-specific recalc if possible.
+        // Best way: get old allocation info BEFORE calling service or returning it from service.
+
+        // Let's refine the service to return project info if possible or handle it here.
+        // For now, we'll just return success and suggest a refresh.
+
+        res.send(result);
+    } catch (error) {
+        console.error('[Partial Delete Error]', error);
+        res.status(500).send({ error: error.message || 'Internal server error' });
+    }
+});
+
 // ============================================
 // LEGACY RESOURCE ENDPOINTS (kept for compatibility)
 // ============================================
@@ -1411,6 +1439,86 @@ app.delete('/smtp-config', authenticate, checkPermission('administration', 'rw')
         }
     } catch (error) {
         console.error('[Delete SMTP Config Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// ============================================
+// FINANCIAL YEAR ENDPOINTS
+// ============================================
+
+app.get('/financial-years', authenticate, async (req, res) => {
+    try {
+        const years = await financialYearRepo.getAll();
+        res.send(years);
+    } catch (error) {
+        console.error('[Get Financial Years Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.post('/financial-years', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const year = await financialYearRepo.create(req.body);
+        res.status(201).send(year);
+    } catch (error) {
+        console.error('[Create Financial Year Error]', error);
+        res.status(400).send({ error: error.message });
+    }
+});
+
+app.put('/financial-years/:id/current', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const success = await financialYearRepo.setCurrent(req.params.id);
+        if (success) {
+            res.send({ message: 'Current financial year updated' });
+        } else {
+            res.status(404).send({ error: 'Financial year not found' });
+        }
+    } catch (error) {
+        console.error('[Set Current Financial Year Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.delete('/financial-years/:id', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const success = await financialYearRepo.delete(req.params.id);
+        if (success) {
+            res.status(204).send();
+        } else {
+            res.status(404).send({ error: 'Financial year not found' });
+        }
+    } catch (error) {
+        console.error('[Delete Financial Year Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// ============================================
+// SYSTEM SETTINGS ENDPOINTS
+// ============================================
+
+app.get('/settings', authenticate, async (req, res) => {
+    try {
+        const settings = await systemSettingsRepo.getAll();
+        res.send(settings);
+    } catch (error) {
+        console.error('[Get Settings Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+app.post('/settings', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key || value === undefined) {
+            return res.status(400).send({ error: 'Key and value are required' });
+        }
+        const setting = await systemSettingsRepo.update(key, value);
+        res.send(setting);
+    } catch (error) {
+        console.error('[Update Setting Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });

@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { API_BASE } from '../config';
 
-const ProjectDashboard = ({ employees = [], allocations = [], projects = [], addToast }) => {
+const ProjectDashboard = ({ employees = [], allocations = [], projects = [], addToast, formatCurrency, systemSettings }) => {
     const token = localStorage.getItem('vibe-token');
     const [financialStore, setFinancialStore] = useState({});
     const [loading, setLoading] = useState(true);
@@ -258,10 +258,10 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>
-                                        Profit: ${metrics.profit.toLocaleString()}
+                                        Profit: {formatCurrency(metrics.profit)}
                                     </span>
                                     <span style={{ fontSize: '0.6rem', color: metrics.profitTrend >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>
-                                        {metrics.profitTrend >= 0 ? '↑' : '↓'} ${Math.abs(metrics.profitTrend).toLocaleString()}
+                                        {metrics.profitTrend >= 0 ? '↑' : '↓'} {formatCurrency(Math.abs(metrics.profitTrend))}
                                     </span>
                                 </div>
                                 {metrics.baselineTrend.length > 1 && (
@@ -344,7 +344,7 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem' }}>
                                     <div>
-                                        <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--fg)', letterSpacing: '-0.025em' }}>${Math.abs(p.variance).toLocaleString()}</div>
+                                        <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--fg)', letterSpacing: '-0.025em' }}>{formatCurrency(Math.abs(p.variance))}</div>
                                         <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 800 }}>{p.variance >= 0 ? 'REMAINING SURPLUS' : 'ESTIMATED DEFICIT'}</div>
                                     </div>
                                     <div style={{ width: '130px', height: '65px' }}>
@@ -355,7 +355,7 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '9px', padding: '4px 8px' }}
                                                     labelStyle={{ fontWeight: 800, color: '#1e293b' }}
                                                     itemStyle={{ padding: 0 }}
-                                                    formatter={(val) => [`$${Math.round(val).toLocaleString()}`, '']}
+                                                    formatter={(val) => [formatCurrency(Math.round(val)), '']}
                                                 />
                                                 <Area
                                                     type="monotone"
@@ -382,8 +382,8 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                     }}></div>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
-                                    <span>USED: ${p.expense.toLocaleString()}</span>
-                                    <span>BUDGET: ${p.plannedBudget.toLocaleString()}</span>
+                                    <span>USED: {formatCurrency(p.expense)}</span>
+                                    <span>BUDGET: {formatCurrency(p.plannedBudget)}</span>
                                 </div>
                             </div>
                         </div>
@@ -448,15 +448,15 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `$${val / 1000}k` : `$${val}`} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `${formatCurrency(val / 1000)}k` : formatCurrency(val)} />
                                     <Tooltip
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '11px', padding: '12px' }}
-                                        formatter={(val) => [`$${parseFloat(val).toLocaleString()}`, '']}
+                                        formatter={(val) => [formatCurrency(parseFloat(val)), '']}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px', fontWeight: 700 }} />
-                                    <Area type="monotone" dataKey="cumBilling" name="Cumulative Billing ($)" stroke="#6366f1" fillOpacity={1} fill="url(#colorBilling)" strokeWidth={3} />
-                                    <Line type="monotone" dataKey="cumExpense" name="Cumulative Expense ($)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
-                                    <Bar dataKey="billing" name="Monthly Billing ($)" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} opacity={0.3} />
+                                    <Area type="monotone" dataKey="cumBilling" name={`Cumulative Billing (${systemSettings?.currency || '$'})`} stroke="#6366f1" fillOpacity={1} fill="url(#colorBilling)" strokeWidth={3} />
+                                    <Line type="monotone" dataKey="cumExpense" name={`Cumulative Expense (${systemSettings?.currency || '$'})`} stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
+                                    <Bar dataKey="billing" name={`Monthly Billing (${systemSettings?.currency || '$'})`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} opacity={0.3} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -477,11 +477,11 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                 <BarChart data={analytics.monthlyMetrics} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `$${val / 1000}k` : `$${val}`} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `${formatCurrency(val / 1000)}k` : formatCurrency(val)} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px' }} />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: 700 }} />
-                                    <Bar dataKey="income" name="Income ($)" fill="#6366f1" radius={[2, 2, 0, 0]} barSize={20} />
-                                    <Bar dataKey="expense" name="Expense ($)" fill="#94a3b8" radius={[2, 2, 0, 0]} barSize={20} />
+                                    <Bar dataKey="income" name={`Income (${systemSettings?.currency || '$'})`} fill="#6366f1" radius={[2, 2, 0, 0]} barSize={20} />
+                                    <Bar dataKey="expense" name={`Expense (${systemSettings?.currency || '$'})`} fill="#94a3b8" radius={[2, 2, 0, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -500,12 +500,12 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
                                 <ComposedChart data={analytics.projectMetrics} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `$${val / 1000}k` : `$${val}`} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `${formatCurrency(val / 1000)}k` : formatCurrency(val)} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px' }} />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: 700 }} />
-                                    <Bar dataKey="income" name="Income ($)" fill="#10b981" radius={[2, 2, 0, 0]} barSize={20} />
-                                    <Bar dataKey="expense" name="Expense ($)" fill="#ef4444" radius={[2, 2, 0, 0]} barSize={20} />
-                                    <Line type="monotone" dataKey="burnRate" hide name="Burnrate ($)" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                    <Bar dataKey="income" name={`Income (${systemSettings?.currency || '$'})`} fill="#10b981" radius={[2, 2, 0, 0]} barSize={20} />
+                                    <Bar dataKey="expense" name={`Expense (${systemSettings?.currency || '$'})`} fill="#ef4444" radius={[2, 2, 0, 0]} barSize={20} />
+                                    <Line type="monotone" dataKey="burnRate" hide name={`Burnrate (${systemSettings?.currency || '$'})`} stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -532,9 +532,9 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
 
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '0.5rem', alignItems: 'center' }}>
                                             <div style={{ fontSize: '0.7rem' }}>
-                                                Cost Variance: <span style={{ fontWeight: 800, color: v.costVariance <= 0 ? '#10b981' : '#ef4444' }}>${v.costVariance.toLocaleString()}</span>
+                                                Cost Variance: <span style={{ fontWeight: 800, color: v.costVariance <= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(v.costVariance)}</span>
                                                 <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '2px' }}>
-                                                    {v.baselineInfo}: ${v.baselineCost.toLocaleString()} → Now: ${v.currentCost.toLocaleString()}
+                                                    {v.baselineInfo}: {formatCurrency(v.baselineCost)} → Now: {formatCurrency(v.currentCost)}
                                                 </div>
                                             </div>
                                             <div style={{ height: '40px' }}>

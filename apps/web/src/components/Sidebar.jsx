@@ -135,7 +135,7 @@ const Sidebar = ({
             <div className="sidebar-footer">
                 <div className="sidebar-user">
                     <div className="sidebar-user-avatar">
-                        {username?.charAt(0).toUpperCase() || 'U'}
+                        {(username && username.length > 0) ? username.charAt(0).toUpperCase() : 'U'}
                     </div>
                     <div className="sidebar-user-info">
                         <div className="sidebar-user-name">{username || 'User'}</div>

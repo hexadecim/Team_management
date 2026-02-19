@@ -5,24 +5,19 @@ import {
 import { API_BASE } from '../config';
 import BurnRateModal from './BurnRateModal';
 
-const CapacityDashboard = ({ token }) => {
-    const [selectedSkill, setSelectedSkill] = useState(null);
+const CapacityDashboard = ({ token, formatCurrency }) => {
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Data States
     const [trendData, setTrendData] = useState([]);
     const [showBurnModal, setShowBurnModal] = useState(false);
-    const [benchStats, setBenchStats] = useState({ totalBench: 0, employees: [], chartData: [] });
-    const [risks, setRisks] = useState({ overAllocated: [], rollingOff: [] });
     const [capacityMix, setCapacityMix] = useState({ totalCapacity: 0, allocatedCapacity: 0, mix: [] });
 
     const [keyStats, setKeyStats] = useState({ totalEmployees: 0, billableEmployees: 0, benchEmployees: 0, benchBurn: 0 });
 
-    const SKILL_COLORS = [
-        '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-        '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#475569'
-    ];
+
 
     useEffect(() => {
         fetchAllData();
@@ -42,8 +37,6 @@ const CapacityDashboard = ({ token }) => {
             await Promise.all([
                 fetchStats(),
                 fetchTrend(),
-                fetchBench(),
-                fetchRisks(),
                 fetchMix()
             ]);
         } catch (err) {
@@ -116,19 +109,7 @@ const CapacityDashboard = ({ token }) => {
         }));
     };
 
-    const fetchBench = async () => {
-        const res = await fetch(`${API_BASE}/analytics/capacity/bench`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) setBenchStats(await res.json());
-    };
 
-    const fetchRisks = async () => {
-        const res = await fetch(`${API_BASE}/analytics/capacity/risks`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) setRisks(await res.json());
-    };
 
     const fetchMix = async () => {
         const res = await fetch(`${API_BASE}/analytics/capacity/mix`, {
@@ -137,18 +118,7 @@ const CapacityDashboard = ({ token }) => {
         if (res.ok) setCapacityMix(await res.json());
     };
 
-    const handleBarClick = (data) => {
-        if (data && data.activeLabel) {
-            setSelectedSkill(selectedSkill === data.activeLabel ? null : data.activeLabel);
-        } else if (data && data.skill) {
-            setSelectedSkill(selectedSkill === data.skill ? null : data.skill);
-        }
-    };
 
-    const selectedSkillEmployees = useMemo(() => {
-        if (!selectedSkill) return [];
-        return benchStats.chartData.find(d => d.skill === selectedSkill)?.employees || [];
-    }, [selectedSkill, benchStats]);
 
     if (loading && !trendData.length) {
         return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading capacity data...</div>;
@@ -185,7 +155,7 @@ const CapacityDashboard = ({ token }) => {
                 <div className="metric-card" onClick={() => setShowBurnModal(true)} style={{ cursor: 'pointer' }}>
                     <div className="metric-label">Bench Cost Burn</div>
                     <div className="metric-value" style={{ color: '#ef4444' }}>
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(keyStats.benchBurn || 0)}
+                        {formatCurrency(keyStats.benchBurn || 0)}
                     </div>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
                         Monthly Unallocated Cost
@@ -235,104 +205,9 @@ const CapacityDashboard = ({ token }) => {
                 </div>
             </div>
 
-            <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>Bench Distribution by Skill</h2>
-                {benchStats.chartData.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No employees on bench for current month.</p>
-                ) : (
-                    <>
-                        <div style={{ width: '100%', height: 250 }}>
-                            <ResponsiveContainer>
-                                <BarChart data={benchStats.chartData} onClick={handleBarClick}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis dataKey="skill" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} dy={10} interval={0} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} allowDecimals={false} />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }} />
-                                    <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={50}>
-                                        {benchStats.chartData.map((entry, index) => (
-                                            <Cell key={`cell-bench-${index}`} fill={SKILL_COLORS[index % SKILL_COLORS.length]} fillOpacity={selectedSkill === entry.skill ? 1 : 0.7} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
 
-                        {selectedSkill && (
-                            <div className="bench-section" style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                    <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800 }}>
-                                        Employees with <span style={{ color: SKILL_COLORS[benchStats.chartData.findIndex(d => d.skill === selectedSkill) % SKILL_COLORS.length] }}>{selectedSkill}</span> skill
-                                    </h3>
-                                    <button onClick={() => setSelectedSkill(null)} style={{ background: 'none', border: 'none', color: 'var(--col-primary)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 700 }}>&times; Close List</button>
-                                </div>
-                                <div className="bench-grid">
-                                    {selectedSkillEmployees.map(emp => (
-                                        <div key={emp.id} className="bench-card">
-                                            <div className="bench-info">
-                                                <h4>{emp.firstName} {emp.lastName}</h4>
-                                                <p>{emp.primarySkills.join(', ')}</p>
-                                            </div>
-                                            <div className="status-badge" style={{ background: '#fef2f2', color: '#991b1b', borderColor: '#fee2e2' }}>Available</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <div className="chart-container">
-                    <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: 'var(--col-danger)' }}>
-                        ⚠️ Risk Radar: Over-allocated
-                    </h2>
-                    {risks.overAllocated.length === 0 ? (
-                        <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No over-allocation risks detected.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {risks.overAllocated.map(emp => (
-                                <div key={emp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#fff1f2', borderRadius: '8px', border: '1px solid #ffe4e6' }}>
-                                    <div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{emp.firstName} {emp.lastName}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#e11d48' }}>{emp.primarySkills?.[0]}</div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#e11d48' }}>{emp.totalLoad}%</div>
-                                        <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Loading</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="chart-container">
-                    <h2 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.5rem', color: '#f59e0b' }}>
-                        🔮 Foresight: Rolling Off Soon
-                    </h2>
-                    {risks.rollingOff.length === 0 ? (
-                        <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No employees rolling off in the next 30 days.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {risks.rollingOff.map(emp => (
-                                <div key={emp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
-                                    <div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{emp.firstName} {emp.lastName}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#d97706' }}>{emp.primarySkills?.[0]}</div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#d97706' }}>{emp.availableFrom}</div>
-                                        <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', fontWeight: 700 }}>Available From</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {showBurnModal && <BurnRateModal token={token} onClose={() => setShowBurnModal(false)} />}
+            {showBurnModal && <BurnRateModal token={token} onClose={() => setShowBurnModal(false)} formatCurrency={formatCurrency} />}
         </div>
     );
 };
