@@ -16,7 +16,11 @@ DELETE FROM iam.users WHERE username != 'admin';
 -- Step 5: Clear failed login attempts
 TRUNCATE TABLE iam.failed_login_attempts;
 
--- Step 6: Clear audit logs (optional - comment out if you want to keep audit history)
+-- Step 6: Delete all analytics data
+TRUNCATE TABLE analytics.daily_metrics CASCADE;
+TRUNCATE TABLE analytics.daily_financials CASCADE;
+
+-- Step 7: Clear audit logs (optional - comment out if you want to keep audit history)
 -- TRUNCATE TABLE iam.audit_log;
 
 -- Verify cleanup
@@ -24,6 +28,8 @@ SELECT 'Users remaining:' as info, COUNT(*) as count FROM iam.users;
 SELECT 'Employees remaining:' as info, COUNT(*) as count FROM core.employees;
 SELECT 'Projects remaining:' as info, COUNT(*) as count FROM core.projects;
 SELECT 'Allocations remaining:' as info, COUNT(*) as count FROM core.allocations;
+SELECT 'Daily metrics remaining:' as info, COUNT(*) as count FROM analytics.daily_metrics;
+SELECT 'Daily financials remaining:' as info, COUNT(*) as count FROM analytics.daily_financials;
 
 -- Display admin user details
 SELECT username, role_names FROM iam.users WHERE username = 'admin';
