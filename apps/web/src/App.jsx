@@ -13,6 +13,7 @@ import SMTPConfig from './components/SMTPConfig';
 import FinancialYearManager from './components/FinancialYearManager';
 import SystemSettings from './components/SystemSettings';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
+import { API_BASE } from './config';
 import { api } from './utils/api';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 
@@ -164,7 +165,6 @@ function App() {
 
       if (res.ok) {
         const data = await res.json();
-        // Store both access and refresh tokens
         localStorage.setItem('vibe-token', data.accessToken);
         localStorage.setItem('vibe-refresh-token', data.refreshToken);
         setToken(data.accessToken);
