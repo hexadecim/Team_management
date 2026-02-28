@@ -13,7 +13,8 @@ import SMTPConfig from './components/SMTPConfig';
 import FinancialYearManager from './components/FinancialYearManager';
 import SystemSettings from './components/SystemSettings';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
-import { API_BASE } from './config';
+import { api } from './utils/api';
+import { ConfigProvider, theme as antdTheme } from 'antd';
 
 const INITIAL_FORM = {
   firstName: '',
@@ -88,7 +89,7 @@ function App() {
   }, [theme]);
 
 
-  const [view, setView] = useState('dashboard');
+  const [view, setView] = useState('capacity');
   const [adminView, setAdminView] = useState('users'); // 'users' or 'roles'
   const [masterView, setMasterView] = useState('employees'); // 'employees' or 'projects'
   const [employees, setEmployees] = useState([]);
@@ -127,23 +128,28 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      // Call logout endpoint
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await api.post('/auth/logout');
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Clear tokens regardless of API call result
       localStorage.removeItem('vibe-token');
       localStorage.removeItem('vibe-refresh-token');
       setToken(null);
       setClaims({});
-      setView('dashboard');
+      setView('capacity');
+    }
+  };
+
+  const glassTheme = {
+    algorithm: theme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+    token: {
+      borderRadius: 12,
+      colorBgContainer: theme === 'dark' ? 'rgba(12, 74, 110, 0.4)' : 'rgba(255, 255, 255, 0.4)',
+      colorBgElevated: theme === 'dark' ? 'rgba(12, 74, 110, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+    },
+    components: {
+      Button: { borderRadius: 10 },
+      Card: { borderRadius: 16 }
     }
   };
 
@@ -195,9 +201,7 @@ function App() {
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${API_BASE}/employees`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get('/employees');
       if (res.ok) setEmployees(await res.json());
       else console.error('Fetch employees failed:', res.status);
     } catch (err) { console.error(err); }
@@ -205,27 +209,21 @@ function App() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_BASE}/projects`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get('/projects');
       if (res.ok) setProjects(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const fetchAllocations = async () => {
     try {
-      const res = await fetch(`${API_BASE}/allocations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get('/allocations');
       if (res.ok) setAllocations(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_BASE}/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get('/settings');
       if (res.ok) setSystemSettings(await res.json());
     } catch (err) { console.error(err); }
   };
@@ -247,9 +245,7 @@ function App() {
 
   const fetchFinancialYears = async () => {
     try {
-      const res = await fetch(`${API_BASE}/financial-years`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get('/financial-years');
       if (res.ok) {
         const data = await res.json();
         setFinancialYears(data);
@@ -307,10 +303,7 @@ function App() {
     if (!window.confirm('Delete FULL allocation?')) return;
 
     try {
-      const res = await fetch(`${API_BASE}/allocations/${allocationToPartialDelete.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.delete(`/allocations/${allocationToPartialDelete.id}`);
 
       if (res.ok) {
         addToast('Allocation deleted successfully', 'success');
@@ -330,16 +323,9 @@ function App() {
     if (!allocationToPartialDelete) return;
 
     try {
-      const res = await fetch(`${API_BASE}/allocations/${allocationToPartialDelete.id}/partial-delete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          startDate: partialDeleteDates.start,
-          endDate: partialDeleteDates.end
-        })
+      const res = await api.post(`/allocations/${allocationToPartialDelete.id}/partial-delete`, {
+        startDate: partialDeleteDates.start,
+        endDate: partialDeleteDates.end
       });
 
       if (res.ok) {
@@ -363,20 +349,13 @@ function App() {
     const payload = { ...allocData, projectName: project ? project.name : '' };
 
     try {
-      const url = isEditMode
-        ? `${API_BASE}/allocations/${selectedAllocationId}`
-        : `${API_BASE}/allocations`;
+      const endpoint = isEditMode
+        ? `/allocations/${selectedAllocationId}`
+        : `/allocations`;
 
-      const method = isEditMode ? 'PUT' : 'POST';
+      const method = isEditMode ? 'put' : 'post';
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const res = await api[method](endpoint, payload);
 
       if (res.status === 400) {
         const errData = await res.json();
@@ -435,389 +414,387 @@ function App() {
   }
 
   return (
-    <div className="app-wrapper">
-      <Sidebar
-        view={view}
-        setView={setView}
-        theme={theme}
-        setTheme={setTheme}
-        handleLogout={handleLogout}
-        claims={claims}
-        username="System Admin"
-      />
+    <ConfigProvider theme={glassTheme}>
+      <div className="app-wrapper glass-effect">
+        <Sidebar
+          view={view}
+          setView={setView}
+          theme={theme}
+          setTheme={setTheme}
+          handleLogout={handleLogout}
+          claims={claims}
+          username="System Admin"
+        />
 
-      <main className="main-content">
-        <header className="old-header" style={{ display: 'none' }}>
-          <h1>Resource System <span style={{ opacity: 0.3 }}>/</span> {
-            view === 'dashboard' ? 'Analytics Dashboard' :
-              view === 'employees' ? 'Master record' :
-                view === 'projects' ? 'Project Master' :
-                  view === 'allocation' ? 'Planning Board' : 'Administration'
-          }</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              className="action-btn"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              style={{ background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)', padding: '0.4rem 0.8rem' }}
-            >
-              {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
-            </button>
-            <div className="status-badge">System Admin</div>
-            <button className="action-btn" onClick={handleLogout} style={{ background: 'var(--col-danger)', color: '#ffffff', padding: '0.4rem 1rem' }}>Logout</button>
-          </div>
-        </header>
-
-        <div className="tabs old-tabs" style={{ display: 'none' }}>
-          {canView('dashboard') && <div className={`tab ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</div>}
-          {canView('employee_list') && <div className={`tab ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>Master record</div>}
-          {canView('allocation') && <div className={`tab ${view === 'allocation' ? 'active' : ''}`} onClick={() => setView('allocation')}>Planning Board</div>}
-          {canView('administration') && <div className={`tab ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Administration</div>}
-        </div>
-
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--fg)' }}>
-            {view === 'capacity' ? 'Capacity Analysis' :
-              view === 'projects_analysis' ? 'Project Analysis' :
-                view === 'employees' ? 'Resource Management' :
-                  view === 'allocation' ? 'Planning Board' :
-                    view === 'admin' ? 'Administration' : 'Dashboard'}
-          </h1>
-          <p className="page-description">
-            {view === 'capacity' ? 'Analyze resource loading, utilization trends, and availability.' :
-              view === 'projects_analysis' ? 'Monitor project financial performance and profitability.' :
-                view === 'employees' ? 'Manage employee records, skills, and rates.' :
-                  view === 'allocation' ? 'Live project assignments and timeline.' :
-                    view === 'admin' ? 'Configure system settings, users, and roles.' : ''}
-          </p>
-        </div>
-
-        {view === 'capacity' && canView('capacity_analysis') && (
-          <CapacityDashboard token={token} formatCurrency={formatCurrency} />
-        )}
-
-        {view === 'projects_analysis' && canView('project_analysis') && (
-          <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} formatCurrency={formatCurrency} systemSettings={systemSettings} />
-        )}
-
-        {view === 'admin' && canView('administration') && (
-          <div className="card">
-            <div className="tabs" style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-              <div
-                className={`tab ${adminView === 'users' ? 'active' : ''}`}
-                onClick={() => setAdminView('users')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+        <main className="main-content">
+          <header className="old-header" style={{ display: 'none' }}>
+            <h1>Resource System <span style={{ opacity: 0.3 }}>/</span> {
+              view === 'dashboard' ? 'Analytics Dashboard' :
+                view === 'employees' ? 'Master record' :
+                  view === 'projects' ? 'Project Master' :
+                    view === 'allocation' ? 'Planning Board' : 'Administration'
+            }</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                className="action-btn"
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                style={{ background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)', padding: '0.4rem 0.8rem' }}
               >
-                User Management
-              </div>
-              <div
-                className={`tab ${adminView === 'roles' ? 'active' : ''}`}
-                onClick={() => setAdminView('roles')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-              >
-                Role Management
-              </div>
-              <div
-                className={`tab ${adminView === 'smtp' ? 'active' : ''}`}
-                onClick={() => setAdminView('smtp')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-              >
-                Email Settings
-              </div>
-              <div
-                className={`tab ${adminView === 'fy' ? 'active' : ''}`}
-                onClick={() => setAdminView('fy')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-              >
-                Financial Years
-              </div>
-              <div
-                className={`tab ${adminView === 'settings' ? 'active' : ''}`}
-                onClick={() => setAdminView('settings')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-              >
-                Currency Settings
-              </div>
+                {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+              </button>
+              <div className="status-badge">System Admin</div>
+              <button className="action-btn" onClick={handleLogout} style={{ background: 'var(--col-danger)', color: '#ffffff', padding: '0.4rem 1rem' }}>Logout</button>
             </div>
+          </header>
 
-            {adminView === 'users' && <UserManager token={token} addToast={addToast} />}
-            {adminView === 'roles' && <RoleManager token={token} addToast={addToast} />}
-            {adminView === 'smtp' && <SMTPConfig token={token} addToast={addToast} />}
-            {adminView === 'fy' && <FinancialYearManager token={token} addToast={addToast} onFYChange={setFinancialYears} />}
-            {adminView === 'settings' && <SystemSettings token={token} addToast={addToast} settings={systemSettings} onSettingsChange={fetchSettings} />}
+          <div className="tabs old-tabs" style={{ display: 'none' }}>
+            {canView('dashboard') && <div className={`tab ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</div>}
+            {canView('employee_list') && <div className={`tab ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>Master record</div>}
+            {canView('allocation') && <div className={`tab ${view === 'allocation' ? 'active' : ''}`} onClick={() => setView('allocation')}>Planning Board</div>}
+            {canView('administration') && <div className={`tab ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Administration</div>}
           </div>
-        )}
 
-        {view === 'employees' && (
-          <div className="card">
-            <div className="tabs" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
-              <div
-                className={`tab ${masterView === 'employees' ? 'active' : ''}`}
-                onClick={() => setMasterView('employees')}
-                style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-              >
-                Employee Master
-              </div>
-              {canView('administration') && (
+          <div style={{ marginBottom: '2rem' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--fg)' }}>
+              {view === 'employees' ? 'Resource Management' :
+                view === 'allocation' ? 'Planning Board' :
+                  view === 'admin' ? 'Administration' : ''}
+            </h1>
+            <p className="page-description">
+              {view === 'employees' ? 'Manage employee records, skills, and rates.' :
+                view === 'allocation' ? 'Live project assignments and timeline.' :
+                  view === 'admin' ? 'Configure system settings, users, and roles.' : ''}
+            </p>
+          </div>
+
+          {view === 'capacity' && canView('capacity_analysis') && (
+            <CapacityDashboard token={token} formatCurrency={formatCurrency} />
+          )}
+
+          {view === 'projects_analysis' && canView('project_analysis') && (
+            <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} formatCurrency={formatCurrency} systemSettings={systemSettings} />
+          )}
+
+          {view === 'admin' && canView('administration') && (
+            <div className="card">
+              <div className="tabs" style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
                 <div
-                  className={`tab ${masterView === 'projects' ? 'active' : ''}`}
-                  onClick={() => setMasterView('projects')}
+                  className={`tab ${adminView === 'users' ? 'active' : ''}`}
+                  onClick={() => setAdminView('users')}
                   style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
                 >
-                  Project Master
+                  User Management
                 </div>
+                <div
+                  className={`tab ${adminView === 'roles' ? 'active' : ''}`}
+                  onClick={() => setAdminView('roles')}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                  Role Management
+                </div>
+                <div
+                  className={`tab ${adminView === 'smtp' ? 'active' : ''}`}
+                  onClick={() => setAdminView('smtp')}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                  Email Settings
+                </div>
+                <div
+                  className={`tab ${adminView === 'fy' ? 'active' : ''}`}
+                  onClick={() => setAdminView('fy')}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                  Financial Years
+                </div>
+                <div
+                  className={`tab ${adminView === 'settings' ? 'active' : ''}`}
+                  onClick={() => setAdminView('settings')}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                  Currency Settings
+                </div>
+              </div>
+
+              {adminView === 'users' && <UserManager token={token} addToast={addToast} />}
+              {adminView === 'roles' && <RoleManager token={token} addToast={addToast} />}
+              {adminView === 'smtp' && <SMTPConfig token={token} addToast={addToast} />}
+              {adminView === 'fy' && <FinancialYearManager token={token} addToast={addToast} onFYChange={setFinancialYears} />}
+              {adminView === 'settings' && <SystemSettings token={token} addToast={addToast} settings={systemSettings} onSettingsChange={fetchSettings} />}
+            </div>
+          )}
+
+          {view === 'employees' && (
+            <div className="card">
+              <div className="tabs" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+                <div
+                  className={`tab ${masterView === 'employees' ? 'active' : ''}`}
+                  onClick={() => setMasterView('employees')}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                  Employee Master
+                </div>
+                {canView('administration') && (
+                  <div
+                    className={`tab ${masterView === 'projects' ? 'active' : ''}`}
+                    onClick={() => setMasterView('projects')}
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                  >
+                    Project Master
+                  </div>
+                )}
+              </div>
+
+              {masterView === 'employees' && canView('employee_list') && (
+                <EmployeeManager
+                  token={token}
+                  canEdit={canEdit}
+                  addToast={addToast}
+                  employees={employees}
+                  projects={projects}
+                  onRefresh={fetchEmployees}
+                  fetchAllocations={fetchAllocations}
+                  formatCurrency={formatCurrency}
+                />
+              )}
+
+              {masterView === 'projects' && canView('administration') && (
+                <ProjectManager
+                  token={token}
+                  projects={projects}
+                  onProjectCreated={fetchProjects}
+                  addToast={addToast}
+                />
               )}
             </div>
+          )}
 
-            {masterView === 'employees' && canView('employee_list') && (
-              <EmployeeManager
-                token={token}
-                canEdit={canEdit}
-                addToast={addToast}
+          {view === 'allocation' && canView('allocation') && (
+            <div className="card" style={{ padding: 0 }}>
+              <AllocationCalendar
                 employees={employees}
+                allocations={allocations}
                 projects={projects}
-                onRefresh={fetchEmployees}
-                fetchAllocations={fetchAllocations}
-                formatCurrency={formatCurrency}
+                selectedFY={selectedFY}
+                onFYChange={setSelectedFY}
+                allFYs={financialYears}
+                onAddAllocation={canEdit('allocation') ? handleOpenAllocPanel : undefined}
+                onShowAllocationList={canView('allocation') ? handleShowAllocationList : undefined}
               />
-            )}
-
-            {masterView === 'projects' && canView('administration') && (
-              <ProjectManager
-                token={token}
-                projects={projects}
-                onProjectCreated={fetchProjects}
-                addToast={addToast}
-              />
-            )}
-          </div>
-        )}
-
-        {view === 'allocation' && canView('allocation') && (
-          <div className="card" style={{ padding: 0 }}>
-            <AllocationCalendar
-              employees={employees}
-              allocations={allocations}
-              projects={projects}
-              selectedFY={selectedFY}
-              onFYChange={setSelectedFY}
-              allFYs={financialYears}
-              onAddAllocation={canEdit('allocation') ? handleOpenAllocPanel : undefined}
-              onShowAllocationList={canView('allocation') ? handleShowAllocationList : undefined}
-            />
-          </div>
-        )}
-
-        <div className="toast-container">
-          {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
-        </div>
-
-        {/* Allocation Panel */}
-        <div className={`overlay ${isAllocPanelOpen ? 'open' : ''}`} onClick={() => setIsAllocPanelOpen(false)}>
-          <div className="slide-over" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ margin: 0 }}>{isEditMode ? 'Edit Allocation' : 'Assign Project'}</h2>
-              <button onClick={() => setIsAllocPanelOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
             </div>
-            <form onSubmit={handleSubmitAllocation}>
-              <div className="input-group">
-                <label>Employee</label>
-                <select value={allocData.employeeId} onChange={e => setAllocData({ ...allocData, employeeId: e.target.value })}>
-                  <option value="">Select Employee</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
-                </select>
+          )}
+
+          <div className="toast-container">
+            {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.message}</div>)}
+          </div>
+
+          {/* Allocation Panel */}
+          <div className={`overlay ${isAllocPanelOpen ? 'open' : ''}`} onClick={() => setIsAllocPanelOpen(false)}>
+            <div className="slide-over" onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{ margin: 0 }}>{isEditMode ? 'Edit Allocation' : 'Assign Project'}</h2>
+                <button onClick={() => setIsAllocPanelOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
               </div>
-              <div className="input-group">
-                <label>Project</label>
-                <select value={allocData.projectId} onChange={e => setAllocData({ ...allocData, projectId: e.target.value })}>
-                  <option value="">Select Project</option>
-                  {projects.filter(p => !p.status || p.status === 'active').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="input-group">
-                <label>Allocation % ({allocData.percentage}%)</label>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <input type="range" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ flex: 1 }} />
-                  <input type="number" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ width: '60px' }} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <form onSubmit={handleSubmitAllocation}>
                 <div className="input-group">
-                  <label>Start Date</label>
-                  <input type="date" value={allocData.startDate} onChange={e => setAllocData({ ...allocData, startDate: e.target.value })} />
+                  <label>Employee</label>
+                  <select value={allocData.employeeId} onChange={e => setAllocData({ ...allocData, employeeId: e.target.value })}>
+                    <option value="">Select Employee</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                  </select>
                 </div>
                 <div className="input-group">
-                  <label>End Date</label>
-                  <input type="date" value={allocData.endDate} onChange={e => setAllocData({ ...allocData, endDate: e.target.value })} />
+                  <label>Project</label>
+                  <select value={allocData.projectId} onChange={e => setAllocData({ ...allocData, projectId: e.target.value })}>
+                    <option value="">Select Project</option>
+                    {projects.filter(p => !p.status || p.status === 'active').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
                 </div>
-              </div>
-              <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>
-                {isEditMode ? 'Update Allocation' : 'Assign Resources'}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Allocation List Modal */}
-        <div className={`overlay ${isAllocationListOpen ? 'open' : ''}`} onClick={() => setIsAllocationListOpen(false)}>
-          <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', margin: 'auto', padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0 }}>
-                {selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}'s Allocations` : 'Allocations'}
-              </h2>
-              <button onClick={() => setIsAllocationListOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
+                <div className="input-group">
+                  <label>Allocation % ({allocData.percentage}%)</label>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <input type="range" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ flex: 1 }} />
+                    <input type="number" min="1" max="100" value={allocData.percentage} onChange={e => setAllocData({ ...allocData, percentage: e.target.value })} style={{ width: '60px' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label>Start Date</label>
+                    <input type="date" value={allocData.startDate} onChange={e => setAllocData({ ...allocData, startDate: e.target.value })} />
+                  </div>
+                  <div className="input-group">
+                    <label>End Date</label>
+                    <input type="date" value={allocData.endDate} onChange={e => setAllocData({ ...allocData, endDate: e.target.value })} />
+                  </div>
+                </div>
+                <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '2rem' }}>
+                  {isEditMode ? 'Update Allocation' : 'Assign Resources'}
+                </button>
+              </form>
             </div>
+          </div>
 
-            {selectedMonthAllocations.length === 0 ? (
-              <p style={{ color: 'var(--muted-fg)', textAlign: 'center', padding: '2rem' }}>No allocations found.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {selectedMonthAllocations.map(allocation => {
-                  const project = projects.find(p => p.id === allocation.projectId);
-                  return (
-                    <div key={allocation.id} className="allocation-item" style={{
-                      padding: '1rem',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: 'var(--card-bg)'
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                          {(project && project.name && project.name.length > 0) ? project.name.charAt(0).toUpperCase() + project.name.slice(1) : 'Unknown Project'}
+          {/* Allocation List Modal */}
+          <div className={`overlay ${isAllocationListOpen ? 'open' : ''}`} onClick={() => setIsAllocationListOpen(false)}>
+            <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', margin: 'auto', padding: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ margin: 0 }}>
+                  {selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}'s Allocations` : 'Allocations'}
+                </h2>
+                <button onClick={() => setIsAllocationListOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--fg)' }}>&times;</button>
+              </div>
+
+              {selectedMonthAllocations.length === 0 ? (
+                <p style={{ color: 'var(--muted-fg)', textAlign: 'center', padding: '2rem' }}>No allocations found.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {selectedMonthAllocations.map(allocation => {
+                    const project = projects.find(p => p.id === allocation.projectId);
+                    return (
+                      <div key={allocation.id} className="allocation-item" style={{
+                        padding: '1rem',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: 'var(--card-bg)'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                            {(project && project.name && project.name.length > 0) ? project.name.charAt(0).toUpperCase() + project.name.slice(1) : 'Unknown Project'}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)' }}>
+                            {allocation.percentage}% • {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)' }}>
-                          {allocation.percentage}% • {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
-                        </div>
+                        {canEdit('allocation') && (
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => handleEditAllocation(allocation)}
+                              className="action-btn"
+                              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAllocation(allocation)}
+                              className="action-btn"
+                              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--col-danger)', color: 'white' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {canEdit('allocation') && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => handleEditAllocation(allocation)}
-                            className="action-btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAllocation(allocation)}
-                            className="action-btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--col-danger)', color: 'white' }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {canEdit('allocation') && (
-              <button
-                onClick={() => {
-                  setIsAllocationListOpen(false);
-                  handleOpenAllocPanel(selectedEmployee, getCurrentMonthIndex());
-                }}
-                className="action-btn"
-                style={{ width: '100%', marginTop: '1.5rem' }}
-              >
-                + Add New Allocation
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Partial Delete Modal */}
-        <div className={`overlay ${isPartialDeleteModalOpen ? 'open' : ''}`} onClick={() => setIsPartialDeleteModalOpen(false)}>
-          <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', padding: '2rem' }}>
-            <h2 style={{ margin: 0, marginBottom: '1.5rem' }}>Delete Allocation</h2>
-            <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem', color: 'var(--muted-fg)' }}>
-              Choose to delete the entire project allocation or only for a specific period.
-            </p>
-
-            <div style={{ marginBottom: '2rem', padding: '1rem', border: '1px dashed var(--border)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--col-primary)', marginBottom: '1rem' }}>DELETE FOR PERIOD</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'flex-end' }}>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>From</label>
-                  <input
-                    type="date"
-                    value={partialDeleteDates.start}
-                    onChange={e => setPartialDeleteDates({ ...partialDeleteDates, start: e.target.value })}
-                    style={{ padding: '0.3rem' }}
-                  />
+                    );
+                  })}
                 </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>To</label>
-                  <input
-                    type="date"
-                    value={partialDeleteDates.end}
-                    onChange={e => setPartialDeleteDates({ ...partialDeleteDates, end: e.target.value })}
-                    style={{ padding: '0.3rem' }}
-                  />
+              )}
+
+              {canEdit('allocation') && (
+                <button
+                  onClick={() => {
+                    setIsAllocationListOpen(false);
+                    handleOpenAllocPanel(selectedEmployee, getCurrentMonthIndex());
+                  }}
+                  className="action-btn"
+                  style={{ width: '100%', marginTop: '1.5rem' }}
+                >
+                  + Add New Allocation
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Partial Delete Modal */}
+          <div className={`overlay ${isPartialDeleteModalOpen ? 'open' : ''}`} onClick={() => setIsPartialDeleteModalOpen(false)}>
+            <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', padding: '2rem' }}>
+              <h2 style={{ margin: 0, marginBottom: '1.5rem' }}>Delete Allocation</h2>
+              <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem', color: 'var(--muted-fg)' }}>
+                Choose to delete the entire project allocation or only for a specific period.
+              </p>
+
+              <div style={{ marginBottom: '2rem', padding: '1rem', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--col-primary)', marginBottom: '1rem' }}>DELETE FOR PERIOD</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'flex-end' }}>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.75rem' }}>From</label>
+                    <input
+                      type="date"
+                      value={partialDeleteDates.start}
+                      onChange={e => setPartialDeleteDates({ ...partialDeleteDates, start: e.target.value })}
+                      style={{ padding: '0.3rem' }}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.75rem' }}>To</label>
+                    <input
+                      type="date"
+                      value={partialDeleteDates.end}
+                      onChange={e => setPartialDeleteDates({ ...partialDeleteDates, end: e.target.value })}
+                      style={{ padding: '0.3rem' }}
+                    />
+                  </div>
                 </div>
+                <button
+                  onClick={handleConfirmDeletePartial}
+                  className="action-btn"
+                  style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem', background: 'var(--col-warning)', color: '#000' }}
+                >
+                  Delete Selected Period
+                </button>
               </div>
-              <button
-                onClick={handleConfirmDeletePartial}
-                className="action-btn"
-                style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem', background: 'var(--col-warning)', color: '#000' }}
-              >
-                Delete Selected Period
-              </button>
-            </div>
 
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button
-                className="action-btn"
-                style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
-                onClick={() => setIsPartialDeleteModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="action-btn"
-                style={{ flex: 1, background: 'var(--col-danger)' }}
-                onClick={handleConfirmDeleteFull}
-              >
-                Delete Full Allocation
-              </button>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="action-btn"
+                  style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
+                  onClick={() => setIsPartialDeleteModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="action-btn"
+                  style={{ flex: 1, background: 'var(--col-danger)' }}
+                  onClick={handleConfirmDeleteFull}
+                >
+                  Delete Full Allocation
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Session Expiry Warning Modal */}
-        <div className={`overlay ${showWarning ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
-          <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '1rem' }}>Session Expiring Soon</h2>
-            <p style={{ fontSize: '0.9rem', color: 'var(--muted-fg)', marginBottom: '2rem', lineHeight: '1.6' }}>
-              Your session will expire in <strong>1 minute</strong> due to inactivity.
-              <br />
-              Click "Stay Logged In" to continue your session.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button
-                className="action-btn"
-                style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
-                onClick={handleLogout}
-              >
-                Logout Now
-              </button>
-              <button
-                className="action-btn"
-                style={{ flex: 1, background: 'var(--col-primary)' }}
-                onClick={handleStayLoggedIn}
-              >
-                Stay Logged In
-              </button>
+          {/* Session Expiry Warning Modal */}
+          <div className={`overlay ${showWarning ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', margin: 'auto', textAlign: 'center', padding: '2rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '1rem' }}>Session Expiring Soon</h2>
+              <p style={{ fontSize: '0.9rem', color: 'var(--muted-fg)', marginBottom: '2rem', lineHeight: '1.6' }}>
+                Your session will expire in <strong>1 minute</strong> due to inactivity.
+                <br />
+                Click "Stay Logged In" to continue your session.
+              </p>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="action-btn"
+                  style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}
+                  onClick={handleLogout}
+                >
+                  Logout Now
+                </button>
+                <button
+                  className="action-btn"
+                  style={{ flex: 1, background: 'var(--col-primary)' }}
+                  onClick={handleStayLoggedIn}
+                >
+                  Stay Logged In
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </ConfigProvider>
   );
 }
 

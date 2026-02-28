@@ -707,6 +707,17 @@ app.get('/analytics/capacity/bench', authenticate, checkPermission('capacity_ana
     }
 });
 
+app.get('/analytics/capacity/billable', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
+    try {
+        const data = await analyticsService.getBillableStats(); // Defaults to today
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.send(data);
+    } catch (error) {
+        console.error('[Analytics Billable Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
 app.get('/analytics/capacity/risks', authenticate, checkPermission('capacity_analysis', 'r'), async (req, res) => {
     try {
         const overAllocated = await analyticsService.getRiskRadar();

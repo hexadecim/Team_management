@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 const FinancialYearManager = ({ token, addToast, onFYChange }) => {
     const [years, setYears] = useState([]);
@@ -14,9 +14,7 @@ const FinancialYearManager = ({ token, addToast, onFYChange }) => {
 
     const fetchYears = async () => {
         try {
-            const res = await fetch(`${API_BASE}/financial-years`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/financial-years');
             if (res.ok) {
                 const data = await res.json();
                 setYears(data);
@@ -31,10 +29,7 @@ const FinancialYearManager = ({ token, addToast, onFYChange }) => {
 
     const handleSetCurrent = async (id) => {
         try {
-            const res = await fetch(`${API_BASE}/financial-years/${id}/current`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.put(`/financial-years/${id}/current`);
             if (res.ok) {
                 addToast('Current financial year updated', 'success');
                 fetchYears();
@@ -50,14 +45,7 @@ const FinancialYearManager = ({ token, addToast, onFYChange }) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_BASE}/financial-years`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
+            const res = await api.post('/financial-years', formData);
 
             if (res.ok) {
                 addToast('Financial year added successfully', 'success');
@@ -78,10 +66,7 @@ const FinancialYearManager = ({ token, addToast, onFYChange }) => {
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this financial year?')) return;
         try {
-            const res = await fetch(`${API_BASE}/financial-years/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.delete(`/financial-years/${id}`);
             if (res.ok) {
                 addToast('Financial year deleted', 'success');
                 fetchYears();

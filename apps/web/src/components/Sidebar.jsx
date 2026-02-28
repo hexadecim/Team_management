@@ -69,7 +69,7 @@ const Sidebar = ({
     ];
 
     return (
-        <aside className="sidebar">
+        <aside className="sidebar glass-effect">
             <div className="sidebar-header">
                 <span className="sidebar-brand">Aganya Core</span>
             </div>
@@ -109,7 +109,7 @@ const Sidebar = ({
                                             </div>
 
                                             {hasSubItems && isExpanded && (
-                                                <div style={{ marginLeft: '1.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '0.5rem' }}>
+                                                <div className="card glass-effect" style={{ marginLeft: '1.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '0.5rem' }}>
                                                     {item.subItems.filter(si => canView(si.permission)).map(si => (
                                                         <div
                                                             key={si.id}

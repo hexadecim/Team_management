@@ -85,14 +85,16 @@ const AllocationCalendar = ({ employees, allocations, projects, onAddAllocation,
                         <select
                             value={selectedProject}
                             onChange={(e) => setSelectedProject(e.target.value)}
+                            className="glass-effect"
                             style={{
                                 padding: '0.4rem',
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255,255,255,0.3)',
                                 fontSize: '0.85rem',
                                 minWidth: '150px',
                                 outline: 'none',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                fontWeight: 700
                             }}
                         >
                             <option value="">All Projects</option>

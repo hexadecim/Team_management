@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 const SystemSettings = ({ token, addToast, settings, onSettingsChange }) => {
     const [isSaving, setIsSaving] = useState(false);
@@ -12,14 +12,7 @@ const SystemSettings = ({ token, addToast, settings, onSettingsChange }) => {
     const handleSaveCurrency = async (newCurrency) => {
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_BASE}/settings`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ key: 'currency', value: newCurrency })
-            });
+            const res = await api.post('/settings', { key: 'currency', value: newCurrency });
 
             if (res.ok) {
                 addToast('Currency setting updated', 'success');

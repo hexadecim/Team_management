@@ -11,17 +11,29 @@ class AnalyticsService {
         // Query daily_metrics table
         // We aggregate to monthly average from the daily snapshots
         const result = await db.queryCore(`
-            SELECT 
-                TO_CHAR(date, 'Mon') as name,
-                TO_CHAR(date, 'Month YYYY') as "fullMonth",
-                EXTRACT(YEAR FROM date) as year,
-                EXTRACT(MONTH FROM date) as month_num,
-                ROUND(AVG(CASE WHEN total_count > 0 THEN (billable_count::FLOAT / total_count::FLOAT) * 100 ELSE 0 END)) as utilization,
-                ROUND(AVG(billable_count)) as "billableAvg",
-                ROUND(AVG(total_count)) as headcount
-            FROM analytics.daily_metrics
-            WHERE date >= $1 AND date <= $2
-            GROUP BY 1, 2, 3, 4
+            WITH monthly_last AS (
+                SELECT DISTINCT ON (EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date))
+                    TO_CHAR(date, 'Mon') as name,
+                    TO_CHAR(date, 'FMMonth YYYY') as "fullMonth",
+                    EXTRACT(YEAR FROM date) as year,
+                    EXTRACT(MONTH FROM date) as month_num,
+                    billable_count,
+                    bench_count,
+                    total_count
+                FROM analytics.daily_metrics
+                WHERE date >= $1 AND date <= $2
+                ORDER BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date), date DESC
+            )
+            SELECT
+                name,
+                "fullMonth",
+                year,
+                month_num,
+                ROUND(CASE WHEN total_count > 0 THEN (billable_count::FLOAT / total_count::FLOAT) * 100 ELSE 0 END) as utilization,
+                billable_count as "billableAvg",
+                bench_count as "benchAvg",
+                total_count as headcount
+            FROM monthly_last
             ORDER BY year, month_num
         `, [startDate, endDate]);
 
@@ -37,7 +49,10 @@ class AnalyticsService {
                     name: today.toLocaleString('default', { month: 'short' }),
                     fullMonth: today.toLocaleString('default', { month: 'long', year: 'numeric' }),
                     year: today.getFullYear(),
+                    month: today.getMonth() + 1,
                     utilization: Math.round((currentStats.billableEmployees / currentStats.totalEmployees) * 100),
+                    billableCount: currentStats.billableEmployees,
+                    benchCount: currentStats.benchEmployees,
                     totalLoad: 0,
                     headcount: currentStats.totalEmployees
                 }];
@@ -51,7 +66,9 @@ class AnalyticsService {
             year: parseInt(row.year),
             month: parseInt(row.month_num),
             utilization: parseInt(row.utilization) || 0,
-            totalLoad: 0, // Not tracking percentage load in this simple model yet
+            billableCount: parseInt(row.billableAvg) || 0,
+            benchCount: parseInt(row.benchAvg) || 0,
+            totalLoad: 0,
             headcount: parseInt(row.headcount) || 0
         }));
     }
@@ -92,6 +109,41 @@ class AnalyticsService {
             totalBench: employees.length,
             employees,
             chartData: Object.values(skillGroups).sort((a, b) => b.count - a.count)
+        };
+    }
+
+    /**
+     * Get current billable statistics (employees with active billable allocations)
+     * @param {string} date - Reference date (default: today)
+     */
+    async getBillableStats(date = new Date().toISOString().split('T')[0]) {
+        const result = await db.queryCore(`
+            SELECT DISTINCT
+                e.id, 
+                e.first_name, 
+                e.last_name, 
+                e.primary_skills, 
+                e.email,
+                p.name as project_name
+            FROM core.employees e
+            JOIN core.allocations a ON e.id = a.employee_id
+            JOIN core.projects p ON a.project_id = p.id
+            WHERE a.start_date <= $1 AND a.end_date >= $1
+            AND p.type = 'billable'
+        `, [date]);
+
+        const employees = result.rows.map(row => ({
+            id: row.id,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            email: row.email,
+            projectName: row.project_name,
+            primarySkills: row.primary_skills || []
+        }));
+
+        return {
+            totalBillable: employees.length,
+            employees
         };
     }
 
@@ -179,21 +231,33 @@ class AnalyticsService {
      */
     async getKeyStats(date = new Date().toISOString().split('T')[0]) {
         try {
-            console.log('[AnalyticsService] getKeyStats called for date:', date);
+
             // Use pre-computed daily_metrics AND daily_financials
             // Get the latest record on or before the requested date
+            // Use pre-computed daily_metrics AND daily_financials
+            // Get the latest metrics for the requested date
+            // BUT for burn rate, we calculate the AVERAGE for that whole month
             const result = await db.queryCore(`
+                WITH RequestedDateMetrics AS (
+                    SELECT total_count, billable_count, bench_count, date
+                    FROM analytics.daily_metrics
+                    WHERE date <= $1
+                    ORDER BY date DESC
+                    LIMIT 1
+                ),
+                MonthlyBurnAverage AS (
+                    SELECT AVG(total_burn_amount) as avg_burn
+                    FROM analytics.daily_financials
+                    WHERE TO_CHAR(date, 'YYYY-MM') = TO_CHAR(($1)::DATE, 'YYYY-MM')
+                )
                 SELECT 
                     m.total_count as "totalEmployees", 
                     m.billable_count as "billableEmployees", 
                     m.bench_count as "benchEmployees",
-                    f.total_burn_amount as "benchBurn",
+                    COALESCE(b.avg_burn, 0) as "benchBurn",
                     m.date
-                FROM analytics.daily_metrics m
-                LEFT JOIN analytics.daily_financials f ON m.date = f.date
-                WHERE m.date <= $1
-                ORDER BY m.date DESC
-                LIMIT 1
+                FROM RequestedDateMetrics m
+                CROSS JOIN MonthlyBurnAverage b
             `, [date]);
 
             if (result.rowCount === 0) {
@@ -235,7 +299,7 @@ class AnalyticsService {
         const result = await db.queryCore(`
             SELECT 
                 TO_CHAR(date, 'Mon') as name,
-                TO_CHAR(date, 'Month YYYY') as "fullMonth",
+                TO_CHAR(date, 'FMMonth YYYY') as "fullMonth",
                 EXTRACT(YEAR FROM date) as year,
                 EXTRACT(MONTH FROM date) as month_num,
                 ROUND(AVG(total_burn_amount)) as "burnRate"

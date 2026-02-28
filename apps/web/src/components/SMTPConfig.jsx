@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 function SMTPConfig({ token, addToast }) {
     const [config, setConfig] = useState({
@@ -28,11 +28,7 @@ function SMTPConfig({ token, addToast }) {
 
     const loadConfig = async () => {
         try {
-            const res = await fetch(`${API_BASE}/smtp-config`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const res = await api.get('/smtp-config');
 
             if (res.ok) {
                 const data = await res.json();
@@ -77,14 +73,7 @@ function SMTPConfig({ token, addToast }) {
                 return;
             }
 
-            const res = await fetch(`${API_BASE}/smtp-config`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(config)
-            });
+            const res = await api.post('/smtp-config', config);
 
             if (res.ok) {
                 addToast('SMTP configuration saved successfully', 'success');
@@ -117,14 +106,7 @@ function SMTPConfig({ token, addToast }) {
         setTesting(true);
 
         try {
-            const res = await fetch(`${API_BASE}/smtp-config/test`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ testEmail })
-            });
+            const res = await api.post('/smtp-config/test', { testEmail });
 
             const data = await res.json();
 
@@ -244,6 +226,8 @@ function SMTPConfig({ token, addToast }) {
                             placeholder="Aganya Core"
                             value={config.fromName}
                             onChange={(e) => setConfig({ ...config, fromName: e.target.value })}
+                            className="glass-effect"
+                            style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }}
                         />
                     </div>
 
@@ -260,7 +244,7 @@ function SMTPConfig({ token, addToast }) {
                 </div>
 
                 <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={loading}>
+                    <button type="submit" className="glass-effect" style={{ width: '100%', marginTop: '1.5rem', padding: '0.8rem', background: 'var(--col-primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 900, fontSize: '0.85rem' }} disabled={loading}>
                         {loading ? 'Saving...' : hasConfig ? 'Update Configuration' : 'Save Configuration'}
                     </button>
                 </div>

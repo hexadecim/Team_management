@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 function ProjectManager({ token, projects, onProjectCreated, addToast }) {
     const [projectName, setProjectName] = useState('');
@@ -37,14 +37,7 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
         };
 
         try {
-            const res = await fetch(`${API_BASE}/projects`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const res = await api.post('/projects', payload);
 
             if (res.ok) {
                 addToast('Project created successfully', 'success');
@@ -80,17 +73,10 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/projects/${editModal.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name: editModal.name,
-                    end_date: newEndDate,
-                    change_reason: changeReason || undefined
-                })
+            const res = await api.put(`/projects/${editModal.id}`, {
+                name: editModal.name,
+                end_date: newEndDate,
+                change_reason: changeReason || undefined
             });
 
             if (res.ok) {
@@ -110,9 +96,7 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
 
     const handleHistoryClick = async (project) => {
         try {
-            const res = await fetch(`${API_BASE}/projects/${project.id}/history`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get(`/projects/${project.id}/history`);
 
             if (res.ok) {
                 const history = await res.json();
@@ -135,10 +119,7 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
         const { id, name } = deleteConfirm;
 
         try {
-            const res = await fetch(`${API_BASE}/projects/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.delete(`/projects/${id}`);
 
             if (res.ok) {
                 addToast('Project deleted successfully', 'success');

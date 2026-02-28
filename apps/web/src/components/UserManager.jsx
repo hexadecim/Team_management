@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 function UserManager({ token, addToast }) {
     const [users, setUsers] = useState([]);
@@ -20,9 +20,7 @@ function UserManager({ token, addToast }) {
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch(`${API_BASE}/users`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/users');
             if (res.ok) {
                 setUsers(await res.json());
             } else {
@@ -33,9 +31,7 @@ function UserManager({ token, addToast }) {
 
     const fetchRoles = async () => {
         try {
-            const res = await fetch(`${API_BASE}/roles`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/roles');
             if (res.ok) {
                 setRoles(await res.json());
             } else {
@@ -46,9 +42,7 @@ function UserManager({ token, addToast }) {
 
     const fetchProjects = async () => {
         try {
-            const res = await fetch(`${API_BASE}/projects`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/projects');
             if (res.ok) setProjects(await res.json());
         } catch (err) { console.error(err); }
     };
@@ -56,18 +50,11 @@ function UserManager({ token, addToast }) {
     const handleCreateUser = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_BASE}/users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    username: newUser.username,
-                    password: newUser.password,
-                    roles: newUser.roles,
-                    project_ids: newUser.project_ids
-                })
+            const res = await api.post('/users', {
+                username: newUser.username,
+                password: newUser.password,
+                roles: newUser.roles,
+                project_ids: newUser.project_ids
             });
 
             if (res.ok) {
@@ -103,14 +90,7 @@ function UserManager({ token, addToast }) {
         if (!editingUser || editingUser.username !== username) return;
 
         try {
-            await fetch(`${API_BASE}/users/${username}/roles`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ roles: editingUser.roles })
-            });
+            await api.put(`/users/${username}/roles`, { roles: editingUser.roles });
             fetchUsers();
             setEditingUser(null);
             setIsEditingRoles(false);
@@ -121,14 +101,7 @@ function UserManager({ token, addToast }) {
         if (!editingUser || editingUser.username !== username) return;
 
         try {
-            await fetch(`${API_BASE}/users/${username}/projects`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ project_ids: editingUser.project_ids })
-            });
+            await api.put(`/users/${username}/projects`, { project_ids: editingUser.project_ids });
             fetchUsers();
             setEditingUser(null);
             setIsEditingProjects(false);
@@ -143,10 +116,7 @@ function UserManager({ token, addToast }) {
         if (!window.confirm(`Are you sure you want to delete user ${username}?`)) return;
 
         try {
-            const res = await fetch(`${API_BASE}/users/${username}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.delete(`/users/${username}`);
             if (res.ok) {
                 addToast('User deleted successfully', 'success');
                 fetchUsers();
@@ -199,7 +169,7 @@ function UserManager({ token, addToast }) {
     };
 
     return (
-        <div className="card" style={{ marginTop: '2rem', background: 'transparent', border: 'none', padding: 0 }}>
+        <div className="card glass-effect" style={{ marginTop: '2rem' }}>
             <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem' }}>
                 <div style={{ flex: 2 }}>
                     <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>System Users</h3>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 const INITIAL_FORM = {
     firstName: '',
@@ -60,16 +60,9 @@ const EmployeeManager = ({ token, canEdit, addToast, fetchAllocations, employees
             secondarySkills: formData.secondarySkills.split(',').map(s => s.trim()).filter(Boolean),
         };
         try {
-            const method = editingId ? 'PUT' : 'POST';
-            const url = editingId ? `${API_BASE}/employees/${editingId}` : `${API_BASE}/employees`;
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const method = editingId ? 'put' : 'post';
+            const url = editingId ? `/employees/${editingId}` : `/employees`;
+            const res = await api[method](url, payload);
             if (!res.ok) {
                 const err = await res.json();
                 addToast(err.error || 'Failed to save employee', 'error');
@@ -86,10 +79,7 @@ const EmployeeManager = ({ token, canEdit, addToast, fetchAllocations, employees
         const { id } = deleteConfirm;
 
         try {
-            const res = await fetch(`${API_BASE}/employees/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.delete(`/employees/${id}`);
 
             if (res.ok) {
                 addToast('Employee removed');
@@ -114,11 +104,8 @@ const EmployeeManager = ({ token, canEdit, addToast, fetchAllocations, employees
         formData.append('file', file);
 
         try {
-            const res = await fetch(`${API_BASE}/employees/upload`, {
+            const res = await apiFetch('/employees/upload', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
                 body: formData
             });
 
@@ -258,16 +245,21 @@ const EmployeeManager = ({ token, canEdit, addToast, fetchAllocations, employees
 
                         <div className="input-group">
                             <label>Designated Project (Master)</label>
-                            <select
+                            <input
                                 value={formData.currentProject}
                                 onChange={e => setFormData({ ...formData, currentProject: e.target.value })}
-                            >
+                                className="glass-effect"
+                                style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }}
+                                placeholder="No specific project assigned"
+                                list="project-options"
+                            />
+                            <datalist id="project-options">
                                 <option value="">No specific project assigned</option>
                                 {Array.isArray(projects) && projects.map(p => (
                                     <option key={p.id} value={p.name}>{p.name}</option>
                                 ))}
                                 {!projects || projects.length === 0 && <option disabled>No projects found</option>}
-                            </select>
+                            </datalist>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

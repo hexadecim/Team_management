@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart, Line, Cell, LineChart, AreaChart, Area
 } from 'recharts';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 const ProjectDashboard = ({ employees = [], allocations = [], projects = [], addToast, formatCurrency, systemSettings }) => {
     const token = localStorage.getItem('vibe-token');
@@ -24,9 +24,7 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
 
         try {
             // Use bulk endpoint to get all project data in one go
-            const res = await fetch(`${API_BASE}/projects/financials/bulk`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/projects/financials/bulk');
 
             if (res.ok) {
                 const bulkData = await res.json();
@@ -65,10 +63,7 @@ const ProjectDashboard = ({ employees = [], allocations = [], projects = [], add
     const captureBaseline = async (projectId) => {
         setBaseliningProjectId(projectId);
         try {
-            const res = await fetch(`${API_BASE}/projects/${projectId}/baseline`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.post(`/projects/${projectId}/baseline`);
             if (res.ok) {
                 if (addToast) addToast('Baseline captured successfully', 'success');
                 await fetchAllFinancials(true);

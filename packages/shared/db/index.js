@@ -10,6 +10,8 @@ const { Pool, types } = require('pg');
 types.setTypeParser(1082, val => val);
 const config = require('./config');
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Create connection pool
 const pool = new Pool({
     host: config.host,
@@ -24,13 +26,8 @@ const pool = new Pool({
 });
 
 // Handle pool errors
-pool.on('error', (err, client) => {
+pool.on('error', (err) => {
     console.error('[DB Pool] Unexpected error on idle client', err);
-});
-
-// Log pool connection
-pool.on('connect', () => {
-    console.log('[DB Pool] New client connected');
 });
 
 /**
@@ -43,18 +40,19 @@ async function query(text, params) {
     const start = Date.now();
     try {
         const res = await pool.query(text, params);
-        const duration = Date.now() - start;
-        console.log('[DB Query]', { text, duration, rows: res.rowCount });
+        if (isDev) {
+            const duration = Date.now() - start;
+            console.log('[DB Query]', { duration, rows: res.rowCount });
+        }
         return res;
     } catch (error) {
-        console.error('[DB Query Error]', { text, error: error.message });
+        console.error('[DB Query Error]', { error: error.message });
         throw error;
     }
 }
 
 /**
  * Execute a query on the IAM schema
- * Automatically prefixes table names with 'iam.'
  * @param {string} text - SQL query text
  * @param {Array} params - Query parameters
  * @returns {Promise} Query result
@@ -65,7 +63,6 @@ async function queryIAM(text, params) {
 
 /**
  * Execute a query on the Core schema
- * Automatically prefixes table names with 'core.'
  * @param {string} text - SQL query text
  * @param {Array} params - Query parameters
  * @returns {Promise} Query result
@@ -83,16 +80,17 @@ async function getClient() {
     const client = await pool.connect();
     const originalQuery = client.query.bind(client);
 
-    // Add query logging to client
     client.query = async (text, params) => {
         const start = Date.now();
         try {
             const res = await originalQuery(text, params);
-            const duration = Date.now() - start;
-            console.log('[DB Client Query]', { text, duration, rows: res.rowCount });
+            if (isDev) {
+                const duration = Date.now() - start;
+                console.log('[DB Client Query]', { duration, rows: res.rowCount });
+            }
             return res;
         } catch (error) {
-            console.error('[DB Client Query Error]', { text, error: error.message });
+            console.error('[DB Client Query Error]', { error: error.message });
             throw error;
         }
     };
@@ -106,7 +104,6 @@ async function getClient() {
  */
 async function close() {
     await pool.end();
-    console.log('[DB Pool] Connection pool closed');
 }
 
 /**

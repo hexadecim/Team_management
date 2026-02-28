@@ -1150,6 +1150,44 @@ tr:hover {
   margin-top: 2rem;
 }
 
+.glass-effect {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+  border-radius: 16px;
+}
+
+[data-theme='dark'] .glass-effect {
+  background: rgba(12, 74, 110, 0.4);
+  /* sky-900 with alpha */
+  border: 1px solid rgba(125, 211, 252, 0.1);
+  /* sky-300 with alpha */
+}
+
+[data-theme='dark'] .glass-card {
+  background: rgba(12, 74, 110, 0.6);
+  border: 1px solid rgba(125, 211, 252, 0.15);
+}
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
 .test-email-card {
   background: var(--card-bg);
   border: 1px solid var(--border);

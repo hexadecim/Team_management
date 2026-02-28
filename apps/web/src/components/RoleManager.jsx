@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../utils/api';
 
 function RoleManager({ token, addToast }) {
     const [roles, setRoles] = useState([]);
@@ -21,9 +21,7 @@ function RoleManager({ token, addToast }) {
 
     const fetchRoles = async () => {
         try {
-            const res = await fetch(`${API_BASE}/roles`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.get('/roles');
             if (res.ok) {
                 setRoles(await res.json());
             } else {
@@ -47,14 +45,7 @@ function RoleManager({ token, addToast }) {
         });
 
         try {
-            const res = await fetch(`${API_BASE}/roles`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ name: newRole.name, permissions })
-            });
+            const res = await api.post('/roles', { name: newRole.name, permissions });
             if (res.ok) {
                 setNewRole({
                     name: '',
@@ -86,14 +77,7 @@ function RoleManager({ token, addToast }) {
         });
 
         try {
-            const res = await fetch(`${API_BASE}/roles/${editingRole.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ name: editingRole.name, permissions })
-            });
+            const res = await api.put(`/roles/${editingRole.id}`, { name: editingRole.name, permissions });
             if (res.ok) {
                 setEditingRole(null);
                 fetchRoles();
@@ -116,10 +100,7 @@ function RoleManager({ token, addToast }) {
         if (!window.confirm(`Are you sure you want to delete the "${name}" role? This might affect users assigned to this role.`)) return;
 
         try {
-            const res = await fetch(`${API_BASE}/roles/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await api.delete(`/roles/${id}`);
             if (res.ok) {
                 addToast('Role deleted successfully', 'success');
                 fetchRoles();
@@ -202,7 +183,7 @@ function RoleManager({ token, addToast }) {
                             <form onSubmit={handleUpdateRole}>
                                 <div className="input-group">
                                     <label>Role Name</label>
-                                    <input value={editingRole.name} onChange={e => setEditingRole({ ...editingRole, name: e.target.value })} required />
+                                    <input value={editingRole.name} onChange={e => setEditingRole({ ...editingRole, name: e.target.value })} required className="glass-effect" style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }} />
                                 </div>
                                 {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
@@ -215,8 +196,8 @@ function RoleManager({ token, addToast }) {
                                     </div>
                                 ))}
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button type="submit" className="action-btn" style={{ flex: 1 }}>Update Role</button>
-                                    <button type="button" onClick={() => setEditingRole(null)} className="action-btn" style={{ flex: 1, background: 'var(--muted)', color: 'var(--fg)' }}>Cancel</button>
+                                    <button type="submit" className="glass-effect" style={{ flex: 1, padding: '0.8rem', background: 'var(--col-primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 900, fontSize: '0.85rem' }}>Update Role</button>
+                                    <button type="button" onClick={() => setEditingRole(null)} className="glass-effect" style={{ flex: 1, padding: '0.8rem', background: 'var(--muted)', color: 'var(--fg)', border: 'none', borderRadius: '10px', fontWeight: 900, fontSize: '0.85rem' }}>Cancel</button>
                                 </div>
                             </form>
                         </>
@@ -226,7 +207,13 @@ function RoleManager({ token, addToast }) {
                             <form onSubmit={handleCreateRole}>
                                 <div className="input-group">
                                     <label>Role Name</label>
-                                    <input value={newRole.name} onChange={e => setNewRole({ ...newRole, name: e.target.value })} required />
+                                    <input
+                                        value={newRole.name}
+                                        onChange={e => setNewRole({ ...newRole, name: e.target.value })}
+                                        required
+                                        className="glass-effect"
+                                        style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }}
+                                    />
                                 </div>
                                 {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
@@ -238,7 +225,7 @@ function RoleManager({ token, addToast }) {
                                         </select>
                                     </div>
                                 ))}
-                                <button type="submit" className="action-btn" style={{ width: '100%' }}>Create Role</button>
+                                <button type="submit" className="glass-effect" style={{ width: '100%', marginTop: '1.5rem', padding: '0.8rem', background: 'var(--col-primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 900, fontSize: '0.85rem' }}>Create Role</button>
                             </form>
                         </>
                     )}
