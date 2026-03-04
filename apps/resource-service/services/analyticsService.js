@@ -359,6 +359,87 @@ class AnalyticsService {
             ]
         };
     }
+
+    /**
+     * Get current Ghost Capacity — employees allocated but under 100%
+     * @param {string} date - Reference date (default: today)
+     */
+    async getGhostCapacity(date = new Date().toISOString().split('T')[0]) {
+        const result = await db.queryCore(`
+            SELECT
+                e.id                                        AS employee_id,
+                e.first_name,
+                e.last_name,
+                e.primary_skills,
+                p.id                                        AS project_id,
+                p.name                                      AS project_name,
+                p.type                                      AS project_type,
+                a.percentage                                AS actual_allocation,
+                (100 - a.percentage)                        AS ghost_capacity,
+                a.start_date,
+                a.end_date
+            FROM core.allocations a
+            JOIN core.employees  e ON a.employee_id = e.id
+            JOIN core.projects   p ON a.project_id  = p.id
+            WHERE a.start_date <= $1
+              AND a.end_date   >= $1
+              AND a.percentage < 100
+            ORDER BY (100 - a.percentage) DESC, e.last_name, e.first_name
+        `, [date]);
+
+        return result.rows.map(r => ({
+            employeeId: r.employee_id,
+            firstName: r.first_name,
+            lastName: r.last_name,
+            primarySkills: r.primary_skills || [],
+            projectId: r.project_id,
+            projectName: r.project_name,
+            projectType: r.project_type,
+            actualAllocation: parseInt(r.actual_allocation),
+            ghostCapacity: parseInt(r.ghost_capacity),
+            startDate: r.start_date,
+            endDate: r.end_date
+        }));
+    }
+
+    /**
+     * Get Ghost Capacity change history (from the log table)
+     * Returns the last N log entries with employee + project names
+     * @param {number} limit - Max rows (default 50)
+     */
+    async getGhostCapacityHistory(limit = 50) {
+        const result = await db.queryCore(`
+            SELECT
+                g.id,
+                e.first_name,
+                e.last_name,
+                p.name          AS project_name,
+                g.actual_allocation,
+                g.ghost_capacity,
+                g.allocation_start,
+                g.allocation_end,
+                g.recorded_at,
+                g.operation
+            FROM analytics.ghost_capacity_log g
+            JOIN core.employees e ON g.employee_id = e.id
+            JOIN core.projects  p ON g.project_id  = p.id
+            ORDER BY g.recorded_at DESC
+            LIMIT $1
+        `, [limit]);
+
+        return result.rows.map(r => ({
+            id: r.id,
+            firstName: r.first_name,
+            lastName: r.last_name,
+            projectName: r.project_name,
+            actualAllocation: parseInt(r.actual_allocation),
+            ghostCapacity: parseInt(r.ghost_capacity),
+            startDate: r.allocation_start,
+            endDate: r.allocation_end,
+            recordedAt: r.recorded_at,
+            operation: r.operation
+        }));
+    }
 }
 
 module.exports = new AnalyticsService();

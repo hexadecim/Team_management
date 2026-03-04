@@ -760,6 +760,32 @@ app.get('/analytics/financial/burn-trend', authenticate, checkPermission('capaci
     }
 });
 
+// GET /analytics/capacity/ghost — current under-allocated (ghost capacity) employees
+app.get('/analytics/capacity/ghost', authenticate, async (req, res) => {
+    try {
+        const date = req.query.date || new Date().toISOString().split('T')[0];
+        const data = await analyticsService.getGhostCapacity(date);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.json({ date, employees: data, totalGhostSlots: data.length });
+    } catch (error) {
+        console.error('[Analytics Ghost Capacity Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
+// GET /analytics/capacity/ghost/history — time-ordered change log
+app.get('/analytics/capacity/ghost/history', authenticate, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const data = await analyticsService.getGhostCapacityHistory(limit);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.json({ history: data });
+    } catch (error) {
+        console.error('[Analytics Ghost History Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
 // ============================================
 // PROJECT ENDPOINTS
 // ============================================

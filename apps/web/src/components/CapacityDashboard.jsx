@@ -29,6 +29,10 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
     const [capacityMix, setCapacityMix] = useState({ totalCapacity: 0, allocatedCapacity: 0, mix: [] });
 
     const [keyStats, setKeyStats] = useState({ totalEmployees: 0, billableEmployees: 0, benchEmployees: 0, benchBurn: 0 });
+    const [ghostEmployees, setGhostEmployees] = useState([]);
+    const [ghostHistory, setGhostHistory] = useState([]);
+    const [showGhostHistory, setShowGhostHistory] = useState(false);
+    const [loadingGhost, setLoadingGhost] = useState(false);
 
     useEffect(() => {
         fetchAllData();
@@ -89,13 +93,30 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
                 fetchStats(),
                 fetchTrend(),
                 fetchMix(),
-                fetchBurnTrend()
+                fetchBurnTrend(),
+                fetchGhostCapacity()
             ]);
         } catch (err) {
             console.error(err);
             setError('Failed to load dashboard data');
         } finally {
             if (!silent) setLoading(false);
+        }
+    };
+
+    const fetchGhostCapacity = async () => {
+        setLoadingGhost(true);
+        try {
+            const [currentRes, historyRes] = await Promise.all([
+                api.get('/analytics/capacity/ghost'),
+                api.get('/analytics/capacity/ghost/history?limit=50')
+            ]);
+            if (currentRes.ok) { const d = await currentRes.json(); setGhostEmployees(d.employees || []); }
+            if (historyRes.ok) { const d = await historyRes.json(); setGhostHistory(d.history || []); }
+        } catch (err) {
+            // silent
+        } finally {
+            setLoadingGhost(false);
         }
     };
 
@@ -205,7 +226,7 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
                     </div>
                 </div>
                 <div className="metric-card" onClick={() => setDrillDownType('billable')} style={{ cursor: 'pointer' }}>
-                    <div className="metric-label">Billable ({currentMonthName})</div>
+                    <div className="metric-label">Earning Employees ({currentMonthName})</div>
                     <div className="metric-value" style={{ color: '#089466ff' }}>{keyStats.billableEmployees}</div>
                     <div style={{ fontSize: '0.7rem', color: '#089466ff', marginTop: '0.5rem' }}>
                         {keyStats.totalEmployees > 0 ? Math.round((keyStats.billableEmployees / keyStats.totalEmployees) * 100) : 0}% Average Utilization.
@@ -234,7 +255,7 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                         <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase' }}>Monthly Utilization Trend</h2>
                     </div>
-                    <div style={{ width: '100%', height: 300 }}>
+                    <div style={{ width: '100%', height: 270 }}>
                         <ResponsiveContainer>
                             <LineChart data={trendData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -249,7 +270,7 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
 
                 <div className="chart-container">
                     <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '2rem' }}>Capacity Mix</h2>
-                    <div style={{ width: '100%', height: 250, position: 'relative' }}>
+                    <div style={{ width: '100%', height: 220, position: 'relative' }}>
                         <ResponsiveContainer>
                             <BarChart layout="vertical" data={capacityMix.mix}>
                                 <XAxis type="number" hide />
@@ -269,6 +290,140 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
                         </p>
                     </div>
                 </div>
+            </div>
+
+            {/* ── Ghost Capacity Report ─────────────────────────────── */}
+            <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--fg)' }}>
+                            Ghost Capacity Report
+                        </h2>
+                        <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                            Employees allocated but under 100% · unused capacity available today
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {ghostEmployees.length > 0 && (
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '0.2rem 0.7rem', borderRadius: '20px', border: '1px solid #fde68a' }}>
+                                {ghostEmployees.length} Ghost Slot{ghostEmployees.length !== 1 ? 's' : ''}
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setShowGhostHistory(v => !v)}
+                            style={{ fontSize: '0.75rem', fontWeight: 700, background: 'var(--muted)', border: '1px solid var(--border, #e2e8f0)', color: 'var(--fg)', borderRadius: '8px', padding: '0.35rem 0.8rem', cursor: 'pointer' }}
+                        >
+                            {showGhostHistory ? 'Hide History' : 'Change History'}
+                        </button>
+                    </div>
+                </div>
+
+                {loadingGhost ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>Loading ghost capacity data…</div>
+                ) : ghostEmployees.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--muted, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border, #e2e8f0)', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        No ghost capacity detected — all allocated employees are at 100%
+                    </div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px', fontSize: '0.83rem' }}>
+                            <thead>
+                                <tr style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem' }}>Employee</th>
+                                    <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem' }}>Project</th>
+                                    <th style={{ textAlign: 'center', padding: '0 0.75rem 0.5rem' }}>Actual %</th>
+                                    <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem', minWidth: 160 }}>Ghost Capacity</th>
+                                    <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem' }}>Period</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {ghostEmployees.map((emp, i) => (
+                                    <tr key={`${emp.employeeId}-${emp.projectId}`} style={{ background: i % 2 === 0 ? 'var(--card-bg, #f8fafc)' : 'transparent' }}>
+                                        <td style={{ padding: '0.6rem 0.75rem', borderRadius: '6px 0 0 6px', fontWeight: 600, color: 'var(--fg)' }}>
+                                            {emp.firstName} {emp.lastName}
+                                            {emp.primarySkills?.length > 0 && (
+                                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.1rem' }}>{emp.primarySkills[0]}</div>
+                                            )}
+                                        </td>
+                                        <td style={{ padding: '0.6rem 0.75rem' }}>
+                                            <span style={{ background: '#ede9fe', color: '#6366f1', fontSize: '0.72rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
+                                                {emp.projectName}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#6366f1' }}>
+                                            {emp.actualAllocation}%
+                                        </td>
+                                        <td style={{ padding: '0.6rem 0.75rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {/* Stacked bar: actual (indigo) + ghost (amber) */}
+                                                <div style={{ flex: 1, height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden', display: 'flex' }}>
+                                                    <div style={{ width: `${emp.actualAllocation}%`, background: '#6366f1', borderRadius: '4px 0 0 4px', transition: 'width 0.3s' }} />
+                                                    <div style={{ width: `${emp.ghostCapacity}%`, background: '#f59e0b', borderRadius: '0 4px 4px 0', transition: 'width 0.3s' }} />
+                                                </div>
+                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', minWidth: 30 }}>
+                                                    {emp.ghostCapacity}%
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '0.6rem 0.75rem', borderRadius: '0 6px 6px 0', fontSize: '0.72rem', color: '#64748b' }}>
+                                            {emp.startDate} → {emp.endDate}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Change History Log */}
+                {showGhostHistory && (
+                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2e8f0)', paddingTop: '1.25rem' }}>
+                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.04em' }}>
+                            Change History
+                        </h3>
+                        {ghostHistory.length === 0 ? (
+                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', padding: '0.75rem' }}>No history recorded yet.</div>
+                        ) : (
+                            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                                    <thead>
+                                        <tr style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', borderBottom: '1px solid var(--border,#e2e8f0)' }}>
+                                            <th style={{ textAlign: 'left', padding: '0.3rem 0.6rem' }}>Timestamp</th>
+                                            <th style={{ textAlign: 'left', padding: '0.3rem 0.6rem' }}>Employee</th>
+                                            <th style={{ textAlign: 'left', padding: '0.3rem 0.6rem' }}>Project</th>
+                                            <th style={{ textAlign: 'center', padding: '0.3rem 0.6rem' }}>Alloc</th>
+                                            <th style={{ textAlign: 'center', padding: '0.3rem 0.6rem' }}>Ghost</th>
+                                            <th style={{ textAlign: 'center', padding: '0.3rem 0.6rem' }}>Op</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ghostHistory.map(h => {
+                                            const opColor = h.operation === 'INSERT' || h.operation === 'BACKFILL' ? '#10b981'
+                                                : h.operation === 'DELETE' ? '#ef4444' : '#f59e0b';
+                                            return (
+                                                <tr key={h.id} style={{ borderBottom: '1px solid var(--border,#f1f5f9)' }}>
+                                                    <td style={{ padding: '0.4rem 0.6rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                                        {new Date(h.recordedAt).toLocaleString()}
+                                                    </td>
+                                                    <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600, color: 'var(--fg)' }}>{h.firstName} {h.lastName}</td>
+                                                    <td style={{ padding: '0.4rem 0.6rem', color: '#6366f1' }}>{h.projectName}</td>
+                                                    <td style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontWeight: 700 }}>{h.actualAllocation}%</td>
+                                                    <td style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontWeight: 700, color: '#b45309' }}>{h.ghostCapacity}%</td>
+                                                    <td style={{ padding: '0.4rem 0.6rem', textAlign: 'center' }}>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, background: opColor + '22', color: opColor, padding: '0.1rem 0.4rem', borderRadius: '10px' }}>
+                                                            {h.operation}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
 
