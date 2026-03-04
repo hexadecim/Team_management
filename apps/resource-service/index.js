@@ -786,6 +786,19 @@ app.get('/analytics/capacity/ghost/history', authenticate, async (req, res) => {
     }
 });
 
+// GET /analytics/capacity/skill-heatmap — headcount + utilization per primary skill
+app.get('/analytics/capacity/skill-heatmap', authenticate, async (req, res) => {
+    try {
+        const date = req.query.date || new Date().toISOString().split('T')[0];
+        const data = await analyticsService.getSkillCapacityHeatmap(date);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.json({ date, skills: data });
+    } catch (error) {
+        console.error('[Analytics Skill Heatmap Error]', error);
+        res.status(500).send({ error: 'Internal server error' });
+    }
+});
+
 // ============================================
 // PROJECT ENDPOINTS
 // ============================================

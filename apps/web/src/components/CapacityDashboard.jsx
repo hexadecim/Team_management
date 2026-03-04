@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell, Treemap
 } from 'recharts';
 import { api } from '../utils/api';
 
@@ -33,6 +33,7 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
     const [ghostHistory, setGhostHistory] = useState([]);
     const [showGhostHistory, setShowGhostHistory] = useState(false);
     const [loadingGhost, setLoadingGhost] = useState(false);
+    const [skillHeatmap, setSkillHeatmap] = useState([]);
 
     useEffect(() => {
         fetchAllData();
@@ -94,7 +95,8 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
                 fetchTrend(),
                 fetchMix(),
                 fetchBurnTrend(),
-                fetchGhostCapacity()
+                fetchGhostCapacity(),
+                fetchSkillHeatmap()
             ]);
         } catch (err) {
             console.error(err);
@@ -118,6 +120,13 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
         } finally {
             setLoadingGhost(false);
         }
+    };
+
+    const fetchSkillHeatmap = async () => {
+        try {
+            const res = await api.get('/analytics/capacity/skill-heatmap');
+            if (res.ok) { const d = await res.json(); setSkillHeatmap(d.skills || []); }
+        } catch (err) { /* silent */ }
     };
 
     const fetchStats = async () => {
@@ -427,6 +436,98 @@ const CapacityDashboard = ({ token, formatCurrency }) => {
             </div>
 
 
+
+            {/* ── Skill-Based Capacity Heatmap ─────────────────────── */}
+            <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.25rem' }}>
+                    <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--fg)' }}>
+                        Skill-Based Capacity Heatmap
+                    </h2>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                        Box size = headcount per skill · Color = billable utilization %
+                    </p>
+                </div>
+
+                {skillHeatmap.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--muted, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border, #e2e8f0)', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        No skill data available
+                    </div>
+                ) : (
+                    <>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <Treemap
+                                data={skillHeatmap}
+                                dataKey="size"
+                                aspectRatio={4 / 3}
+                                content={({ x, y, width, height, name, utilization, headcount }) => {
+                                    const u = utilization || 0;
+                                    let fill;
+                                    if (u <= 50) {
+                                        const t = u / 50;
+                                        fill = `rgb(${Math.round(220 + (251 - 220) * t)},${Math.round(38 + (191 - 38) * t)},${Math.round(38 + (36 - 38) * t)})`;
+                                    } else {
+                                        const t = (u - 50) / 50;
+                                        fill = `rgb(${Math.round(251 + (34 - 251) * t)},${Math.round(191 + (197 - 191) * t)},${Math.round(36 + (94 - 36) * t)})`;
+                                    }
+                                    const show = width > 60 && height > 40;
+                                    return (
+                                        <g>
+                                            <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} stroke="var(--card-bg,white)" strokeWidth={2} />
+                                            {show && (
+                                                <>
+                                                    <text x={x + width / 2} y={y + height / 2 - 8} textAnchor="middle" fill="#fff" fontSize={Math.min(13, width / 8)} fontWeight={700}>{name}</text>
+                                                    <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={10} fontWeight={600}>{headcount} ppl · {u}%</text>
+                                                </>
+                                            )}
+                                        </g>
+                                    );
+                                }}
+                            />
+                        </ResponsiveContainer>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.75rem 0 1.5rem' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>0% util</span>
+                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'linear-gradient(to right, rgb(220,38,38), rgb(251,191,36), rgb(34,197,94))' }} />
+                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>100% util</span>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: '0.82rem' }}>
+                                <thead>
+                                    <tr style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem' }}>Skill</th>
+                                        <th style={{ textAlign: 'center', padding: '0 0.75rem 0.5rem' }}>Headcount</th>
+                                        <th style={{ textAlign: 'center', padding: '0 0.75rem 0.5rem' }}>Billable</th>
+                                        <th style={{ textAlign: 'center', padding: '0 0.75rem 0.5rem' }}>On Bench</th>
+                                        <th style={{ textAlign: 'center', padding: '0 0.75rem 0.5rem' }}>Util %</th>
+                                        <th style={{ textAlign: 'left', padding: '0 0.75rem 0.5rem', minWidth: 120 }}>Bar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {skillHeatmap.map((row, i) => {
+                                        const barColor = row.utilization >= 70 ? '#22c55e' : row.utilization >= 40 ? '#f59e0b' : '#ef4444';
+                                        const utilColor = row.utilization >= 70 ? '#16a34a' : row.utilization >= 40 ? '#d97706' : '#dc2626';
+                                        return (
+                                            <tr key={row.name} style={{ background: i % 2 === 0 ? 'var(--card-bg, #f8fafc)' : 'transparent' }}>
+                                                <td style={{ padding: '0.55rem 0.75rem', borderRadius: '6px 0 0 6px', fontWeight: 700, color: 'var(--fg)' }}>{row.name}</td>
+                                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 600 }}>{row.headcount}</td>
+                                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 600, color: '#6366f1' }}>{row.billableCount}</td>
+                                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 600, color: '#ea580c' }}>{row.benchCount}</td>
+                                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 700, color: utilColor }}>{row.utilization}%</td>
+                                                <td style={{ padding: '0.55rem 0.75rem', borderRadius: '0 6px 6px 0' }}>
+                                                    <div style={{ height: 8, borderRadius: 4, overflow: 'hidden', background: '#e2e8f0' }}>
+                                                        <div style={{ width: `${row.utilization}%`, height: '100%', background: barColor, transition: 'width 0.4s' }} />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
+            </div>
 
             {drillDownType && (
                 <div className="overlay open" onClick={() => setDrillDownType(null)}>

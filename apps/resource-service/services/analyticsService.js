@@ -440,6 +440,71 @@ class AnalyticsService {
             operation: r.operation
         }));
     }
+
+    /**
+     * Get Skill-Based Capacity Heatmap data
+     * Groups employees by primary skill, computes headcount + utilization %
+     * @param {string} date - Reference date (default: today)
+     */
+    async getSkillCapacityHeatmap(date = new Date().toISOString().split('T')[0]) {
+        const result = await db.queryCore(`
+            WITH skill_employees AS (
+                -- All employees with their primary skill
+                SELECT
+                    e.id,
+                    COALESCE(e.primary_skills[1], 'Unspecified') AS skill,
+                    -- Is this employee billable on the given date?
+                    EXISTS (
+                        SELECT 1 FROM core.allocations a
+                        JOIN core.projects p ON a.project_id = p.id
+                        WHERE a.employee_id = e.id
+                          AND a.start_date <= $1 AND a.end_date >= $1
+                          AND p.type = 'billable'
+                    ) AS is_billable,
+                    -- Is this employee allocated at all on the given date?
+                    EXISTS (
+                        SELECT 1 FROM core.allocations a
+                        WHERE a.employee_id = e.id
+                          AND a.start_date <= $1 AND a.end_date >= $1
+                    ) AS is_allocated,
+                    -- Sum of allocation % for today
+                    COALESCE((
+                        SELECT SUM(a.percentage)
+                        FROM core.allocations a
+                        WHERE a.employee_id = e.id
+                          AND a.start_date <= $1 AND a.end_date >= $1
+                    ), 0) AS total_allocation
+                FROM core.employees e
+            )
+            SELECT
+                skill,
+                COUNT(*)                         AS headcount,
+                COUNT(*) FILTER (WHERE is_billable)   AS billable_count,
+                COUNT(*) FILTER (WHERE is_allocated)  AS allocated_count,
+                COUNT(*) FILTER (WHERE NOT is_allocated) AS bench_count,
+                ROUND(AVG(total_allocation))     AS avg_allocation
+            FROM skill_employees
+            GROUP BY skill
+            ORDER BY headcount DESC
+        `, [date]);
+
+        return result.rows.map(r => {
+            const headcount = parseInt(r.headcount);
+            const billable = parseInt(r.billable_count);
+            const utilization = headcount > 0 ? Math.round((billable / headcount) * 100) : 0;
+            return {
+                name: r.skill,
+                headcount,
+                billableCount: billable,
+                allocatedCount: parseInt(r.allocated_count),
+                benchCount: parseInt(r.bench_count),
+                utilization,
+                avgAllocation: parseInt(r.avg_allocation),
+                // size drives treemap box area
+                size: headcount
+            };
+        });
+    }
 }
 
 module.exports = new AnalyticsService();
