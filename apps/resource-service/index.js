@@ -48,7 +48,8 @@ const userRepo = require('./repository/userRepository');
 const employeeRepo = require('./repository/employeeRepository');
 const projectRepo = require('./repository/projectRepository');
 const allocationRepo = require('./repository/allocationRepository');
-const financialCalculationService = require('./services/financialCalculationService');
+
+const costAnalysisService = require('./services/costAnalysisService');
 const allocationService = require('./services/allocationService');
 const financialYearRepo = require('./repository/financialYearRepository');
 const SMTPConfigRepository = require('../../packages/shared/repositories/smtpConfigRepository');
@@ -936,14 +937,7 @@ app.post('/employees/upload', authenticate, upload.single('file'), handleMulterE
             count: employees.length
         });
 
-        // Trigger global recalculation after bulk upload since many projects might be affected
-        (async () => {
-            try {
-                await financialCalculationService.recalculateAllProjects();
-            } catch (err) {
-                console.error('[Bulk Upload Recalc Error]', err);
-            }
-        })();
+
 
     } catch (error) {
         console.error('[Bulk Upload Error]', error);
@@ -1024,13 +1018,13 @@ app.put('/projects/:id',
             if (!project) return res.status(404).send({ error: 'Not found' });
             await AuditLogger.logAuth(req.user.username, 'PROJECT_UPDATED', true, { projectId: project.id, changes: req.body });
 
-            // Trigger recalculation on project update (budget or dates might have changed)
-            // Use background execution to avoid blocking the response
+
+            // Recalculate cost analysis in background
             (async () => {
                 try {
-                    await financialCalculationService.calculateProjectFinancials(project.id);
-                } catch (calcError) {
-                    console.error('[Recalculation Error]', calcError);
+                    await costAnalysisService.calculateProjectMargin(project.id);
+                } catch (err) {
+                    console.error('[CostRecalc Error]', err);
                 }
             })();
 
@@ -1080,96 +1074,45 @@ app.get('/analytics/project-deviations', authenticate, checkPermission('dashboar
 });
 
 // ============================================
-// PROJECT FINANCIAL ENDPOINTS
+// COST ANALYSIS ENDPOINTS (Reports)
 // ============================================
 
-// Get project financial summary
-app.get('/projects/:id/financials', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+app.get('/analytics/cost/margin-report', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
     try {
-        const financials = await financialCalculationService.getProjectFinancialSummary(req.params.id);
-        res.send(financials);
+        const report = await costAnalysisService.getMarginReport();
+        res.send(report);
     } catch (error) {
-        console.error('[Get Project Financials Error]', error);
+        console.error('[Margin Report Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });
 
-// Get bulk financials for all projects (optimized for dashboard)
-app.get('/projects/financials/bulk', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+app.get('/analytics/cost/margin-trend/:projectId', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
     try {
-        const bulkData = await financialCalculationService.getBulkFinancials();
-        res.send(bulkData);
+        const trend = await costAnalysisService.getMarginTrend(req.params.projectId);
+        res.send(trend);
     } catch (error) {
-        console.error('[Get Bulk Financials Error]', error);
+        console.error('[Margin Trend Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });
 
-// Get project baseline history
-app.get('/projects/:id/baselines', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
+app.get('/analytics/cost/margin-breakdown/:projectId', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
     try {
-        const baselines = await financialCalculationService.getProjectBaselines(req.params.id);
-        res.send(baselines);
+        const breakdown = await costAnalysisService.getProjectMarginBreakdown(req.params.projectId);
+        res.send(breakdown);
     } catch (error) {
-        console.error('[Get Project Baselines Error]', error);
+        console.error('[Margin Breakdown Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });
 
-// Manually capture a new baseline
-app.post('/projects/:id/baseline', authenticate, checkPermission('dashboard', 'rw'), async (req, res) => {
+app.post('/analytics/cost/recalculate-all', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
     try {
-        const baseline = await financialCalculationService.createProjectBaseline(req.params.id);
-        await AuditLogger.logAuth(req.user.username, 'PROJECT_BASELINE_CAPTURED', true, { projectId: req.params.id, version: baseline.version });
-        res.send(baseline);
+        await costAnalysisService.calculateAllProjectMargins();
+        res.send({ message: 'Global margin recalculation triggered' });
     } catch (error) {
-        console.error('[Create Project Baseline Error]', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-});
-
-// Get monthly billing projections
-app.get('/projects/:id/billing-monthly', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
-    try {
-        const billing = await financialCalculationService.getMonthlyBilling(req.params.id);
-        res.send(billing);
-    } catch (error) {
-        console.error('[Get Monthly Billing Error]', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-});
-
-// Get monthly expense projections
-app.get('/projects/:id/expenses-monthly', authenticate, checkPermission('dashboard', 'r'), async (req, res) => {
-    try {
-        const expenses = await financialCalculationService.getMonthlyExpenses(req.params.id);
-        res.send(expenses);
-    } catch (error) {
-        console.error('[Get Monthly Expenses Error]', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-});
-
-// Trigger financial recalculation for a project
-app.post('/projects/:id/recalculate', authenticate, checkPermission('dashboard', 'rw'), async (req, res) => {
-    try {
-        const result = await financialCalculationService.calculateProjectFinancials(req.params.id);
-        await AuditLogger.logAuth(req.user.username, 'PROJECT_FINANCIALS_RECALCULATED', true, { projectId: req.params.id });
-        res.send({ message: 'Recalculation triggered', result });
-    } catch (error) {
-        console.error('[Recalculation Error]', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-});
-
-// Admin endpoint to recalculate all projects
-app.post('/financials/recalculate-all', authenticate, checkPermission('administration', 'rw'), async (req, res) => {
-    try {
-        const results = await financialCalculationService.recalculateAllProjects();
-        await AuditLogger.logAuth(req.user.username, 'ALL_PROJECT_FINANCIALS_RECALCULATED', true, { count: results.length });
-        res.send({ message: 'Global recalculation triggered', results });
-    } catch (error) {
-        console.error('[Global Recalculation Error]', error);
+        console.error('[Margin Global Recalc Error]', error);
         res.status(500).send({ error: 'Internal server error' });
     }
 });
@@ -1216,12 +1159,14 @@ app.post('/allocations', authenticate, checkPermission('allocation', 'rw'), asyn
             }
         })();
 
-        // Trigger financial recalculation for the project
+
+
+        // Recalculate cost analysis in background
         (async () => {
             try {
-                await financialCalculationService.calculateProjectFinancials(allocation.projectId);
-            } catch (calcError) {
-                console.error('[Recalculation Error]', calcError);
+                await costAnalysisService.calculateProjectMargin(allocation.projectId);
+            } catch (err) {
+                console.error('[CostRecalc Error]', err);
             }
         })();
 
@@ -1278,18 +1223,17 @@ app.put('/allocations/:id', authenticate, checkPermission('allocation', 'rw'), a
             }
         })();
 
-        // Trigger financial recalculation for the project(s)
+
+
+        // Recalculate cost analysis in background
         (async () => {
             try {
-                // Recalculate for the original project
-                await financialCalculationService.calculateProjectFinancials(oldAllocation.projectId);
-
-                // If project changed, recalculate for the new project as well
+                await costAnalysisService.calculateProjectMargin(oldAllocation.projectId);
                 if (allocation.projectId !== oldAllocation.projectId) {
-                    await financialCalculationService.calculateProjectFinancials(allocation.projectId);
+                    await costAnalysisService.calculateProjectMargin(allocation.projectId);
                 }
-            } catch (calcError) {
-                console.error('[Recalculation Error]', calcError);
+            } catch (err) {
+                console.error('[CostRecalc Error]', err);
             }
         })();
 
@@ -1335,12 +1279,12 @@ app.delete('/allocations/:id', authenticate, checkPermission('allocation', 'rw')
             }
         })();
 
-        // Trigger financial recalculation for the project
+        // Recalculate cost analysis in background
         (async () => {
             try {
-                await financialCalculationService.calculateProjectFinancials(allocation.projectId);
-            } catch (calcError) {
-                console.error('[Recalculation Error]', calcError);
+                await costAnalysisService.calculateProjectMargin(allocation.projectId);
+            } catch (err) {
+                console.error('[CostRecalc Error]', err);
             }
         })();
 

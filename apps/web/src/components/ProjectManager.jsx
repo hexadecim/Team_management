@@ -9,8 +9,10 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
     const [plannedBudget, setPlannedBudget] = useState('');
     const [averageWorkingHours, setAverageWorkingHours] = useState('160');
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
-    const [editModal, setEditModal] = useState(null); // { id, name, currentEndDate }
+    const [editModal, setEditModal] = useState(null); // { id, name, currentEndDate, currentBudget, currentHours }
     const [newEndDate, setNewEndDate] = useState('');
+    const [newBudget, setNewBudget] = useState('');
+    const [newHours, setNewHours] = useState('160');
     const [changeReason, setChangeReason] = useState('');
     const [historyModal, setHistoryModal] = useState(null); // { id, name, history }
 
@@ -60,9 +62,13 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
         setEditModal({
             id: project.id,
             name: project.name,
-            currentEndDate: project.end_date
+            currentEndDate: project.end_date,
+            currentBudget: project.planned_budget,
+            currentHours: project.average_working_hours
         });
         setNewEndDate(project.end_date || '');
+        setNewBudget(project.planned_budget || '');
+        setNewHours(project.average_working_hours || '160');
         setChangeReason('');
     };
 
@@ -76,6 +82,8 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
             const res = await api.put(`/projects/${editModal.id}`, {
                 name: editModal.name,
                 end_date: newEndDate,
+                planned_budget: parseFloat(newBudget) || 0,
+                average_working_hours: parseInt(newHours) || 160,
                 change_reason: changeReason || undefined
             });
 
@@ -83,6 +91,8 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
                 addToast('Project updated successfully', 'success');
                 setEditModal(null);
                 setNewEndDate('');
+                setNewBudget('');
+                setNewHours('160');
                 setChangeReason('');
                 onProjectCreated();
             } else {
@@ -328,6 +338,28 @@ function ProjectManager({ token, projects, onProjectCreated, addToast }) {
                             type="date"
                             value={newEndDate}
                             onChange={e => setNewEndDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="input-group" style={{ marginTop: '1rem' }}>
+                        <label>Budget ($)</label>
+                        <input
+                            type="number"
+                            value={newBudget}
+                            onChange={e => setNewBudget(e.target.value)}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                        />
+                    </div>
+                    <div className="input-group" style={{ marginTop: '1rem' }}>
+                        <label>Working Hours/Month</label>
+                        <input
+                            type="number"
+                            value={newHours}
+                            onChange={e => setNewHours(e.target.value)}
+                            min="1"
+                            step="1"
+                            placeholder="160"
                         />
                     </div>
                     <div className="input-group" style={{ marginTop: '1rem' }}>

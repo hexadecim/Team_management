@@ -7,7 +7,7 @@ function RoleManager({ token, addToast }) {
         name: '',
         permissions: {
             capacity_analysis: 'none',
-            project_analysis: 'none',
+            cost_analysis: 'none',
             employee_list: 'none',
             allocation: 'none',
             administration: 'none'
@@ -51,7 +51,7 @@ function RoleManager({ token, addToast }) {
                     name: '',
                     permissions: {
                         capacity_analysis: 'none',
-                        project_analysis: 'none',
+                        cost_analysis: 'none',
                         employee_list: 'none',
                         allocation: 'none',
                         administration: 'none'
@@ -117,7 +117,7 @@ function RoleManager({ token, addToast }) {
     const startEditing = (role) => {
         const fullPerms = {
             capacity_analysis: 'none',
-            project_analysis: 'none',
+            cost_analysis: 'none',
             employee_list: 'none',
             allocation: 'none',
             administration: 'none',
@@ -185,7 +185,7 @@ function RoleManager({ token, addToast }) {
                                     <label>Role Name</label>
                                     <input value={editingRole.name} onChange={e => setEditingRole({ ...editingRole, name: e.target.value })} required className="glass-effect" style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }} />
                                 </div>
-                                {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
+                                {['capacity_analysis', 'cost_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
                                         <label style={{ textTransform: 'capitalize' }}>{mod.replace(/_/g, ' ')} Access</label>
                                         <select value={editingRole.permissions[mod]} onChange={e => handlePermChange(editingRole, setEditingRole, mod, e.target.value)}>
@@ -215,7 +215,7 @@ function RoleManager({ token, addToast }) {
                                         style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', padding: '0.75rem', fontWeight: 600 }}
                                     />
                                 </div>
-                                {['capacity_analysis', 'project_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
+                                {['capacity_analysis', 'cost_analysis', 'employee_list', 'allocation', 'administration'].map(mod => (
                                     <div key={mod} className="input-group">
                                         <label style={{ textTransform: 'capitalize' }}>{mod.replace(/_/g, ' ')} Access</label>
                                         <select value={newRole.permissions[mod]} onChange={e => handlePermChange(newRole, setNewRole, mod, e.target.value)}>

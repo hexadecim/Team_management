@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './index.css';
 import AllocationCalendar from './components/AllocationCalendar';
 import CapacityDashboard from './components/CapacityDashboard';
-import ProjectDashboard from './components/ProjectDashboard';
+import CostAnalysisDashboard from './components/CostAnalysisDashboard';
+
 import RoleManager from './components/RoleManager';
 import UserManager from './components/UserManager';
 import ProjectManager from './components/ProjectManager';
@@ -471,9 +472,11 @@ function App() {
             <CapacityDashboard token={token} formatCurrency={formatCurrency} />
           )}
 
-          {view === 'projects_analysis' && canView('project_analysis') && (
-            <ProjectDashboard employees={employees} allocations={allocations} projects={projects} addToast={addToast} formatCurrency={formatCurrency} systemSettings={systemSettings} />
+          {view === 'cost_analysis' && canView('cost_analysis') && (
+            <CostAnalysisDashboard formatCurrency={formatCurrency} />
           )}
+
+
 
           {view === 'admin' && canView('administration') && (
             <div className="card">

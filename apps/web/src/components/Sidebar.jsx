@@ -36,7 +36,7 @@ const Sidebar = ({
                     ),
                     subItems: [
                         { id: 'capacity', label: 'Capacity Analysis', icon: '📊', permission: 'capacity_analysis' },
-                        { id: 'projects_analysis', label: 'Project Analysis', icon: '💰', permission: 'project_analysis' },
+                        { id: 'cost_analysis', label: 'Cost Analysis', icon: '💰', permission: 'cost_analysis' },
                     ]
                 },
             ]
