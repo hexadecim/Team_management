@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: team-mgmt-db
+    environment:
+      POSTGRES_DB: team_management
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - team-mgmt-network
+    restart: always
+
+  # Event Bus Service
+  event-bus:
+    build:
+      context: .
+      dockerfile: apps/event-bus/Dockerfile
+    container_name: team-mgmt-event-bus
+    environment:
+      NODE_ENV: production
+      PORT: 4005
+    ports:
+      - "4005:4005"
+    networks:
+      - team-mgmt-network
+    restart: unless-stopped
+
+  # Backend Resource Service
+  backend:
+    build:
+      context: .
+      dockerfile: apps/resource-service/Dockerfile
+    container_name: team-mgmt-backend
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: team_management
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "4001:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - team-mgmt-network
+    restart: unless-stopped
+
+  # Analytics Service
+  analytics:
+    build:
+      context: .
+      dockerfile: apps/analytics-service/Dockerfile
+    container_name: team-mgmt-analytics
+    environment:
+      NODE_ENV: production
+      PORT: 4002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: team_management
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "4002:4002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - team-mgmt-network
+    restart: unless-stopped
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: team-mgmt-frontend
+    environment:
+      VITE_API_BASE: /api
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - analytics
+    networks:
+      - team-mgmt-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  team-mgmt-network:
+    driver: bridge
