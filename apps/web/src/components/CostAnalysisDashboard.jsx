@@ -64,7 +64,7 @@ const CostAnalysisDashboard = ({ formatCurrency }) => {
             <div className="header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0 }}>Cost Analysis</h1>
-                    <p style={{ opacity: 0.7, margin: '0.2rem 0 0 0' }}>Real-Time Project Margin & Timeline Report</p>
+                    <p style={{ opacity: 0.7, margin: '0.2rem 0 0 0' }}> Project Margin & Timeline Report</p>
                 </div>
                 <button className="glass-effect action-btn" onClick={fetchReport} style={{ padding: '0.6rem 1.2rem', borderRadius: '12px' }}>
                     Refresh Data
@@ -73,7 +73,7 @@ const CostAnalysisDashboard = ({ formatCurrency }) => {
 
             {/* Performance Overview Table */}
             <div className="card glass-effect" style={{ padding: '1.5rem', borderRadius: '24px', overflow: 'hidden' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '1.2rem', fontSize: '1.1rem' }}>Project Viability Overview</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '1.2rem', fontSize: '1.1rem' }}>Project Profitability Overview</h3>
                 <div style={{ overflowX: 'auto' }}>
                     <table className="analysis-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
                         <thead>
@@ -139,7 +139,7 @@ const CostAnalysisDashboard = ({ formatCurrency }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
                 <div className="card glass-effect" style={{ padding: '1.5rem', borderRadius: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Financial Drill-Down: {selectedProject?.project_name}</h3>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Detailed overview: {selectedProject?.project_name}</h3>
                         <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
                             Showing {breakdownData.length} allocation segments
                         </div>
