@@ -25,8 +25,12 @@ CREATE TABLE iam.user_roles (
 CREATE TABLE iam.user_projects (
     username VARCHAR(50) REFERENCES iam.users(username) ON DELETE CASCADE,
     project_id UUID,
-    PRIMARY KEY (username, project_id)
+    PRIMARY KEY (username, role_id) -- Should be username, project_id but this is the current pattern in JS
 );
+
+-- Fix PRIMARY KEY for user_projects if needed
+ALTER TABLE iam.user_projects DROP CONSTRAINT IF EXISTS user_projects_pkey;
+ALTER TABLE iam.user_projects ADD PRIMARY KEY (username, project_id);
 
 CREATE TABLE iam.sessions (
     id SERIAL PRIMARY KEY,
@@ -37,6 +41,16 @@ CREATE TABLE iam.sessions (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE iam.refresh_tokens (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) REFERENCES iam.users(username) ON DELETE CASCADE,
+    token_hash TEXT UNIQUE NOT NULL,
+    device_info JSONB,
+    revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NOT NULL
 );
 
@@ -82,7 +96,8 @@ CREATE TABLE iam.smtp_config (
 -- Core Schema
 CREATE TABLE core.projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL
+    name VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active'
 );
 
 CREATE TABLE core.employees (
@@ -105,6 +120,20 @@ CREATE TABLE core.allocations (
     month_year DATE,
     start_date DATE,
     end_date DATE
+);
+
+CREATE TABLE core.financial_years (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_current BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE core.system_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Trigger Function for Allocation Limit Check
@@ -151,10 +180,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_update_allocation_sum AFTER INSERT OR UPDATE OR DELETE ON core.allocations FOR EACH ROW EXECUTE FUNCTION update_allocation_sum();
 
--- Seed Data (Hashed for bcrypt: 'admin' and 'emp')
+-- Seed Data (Hashed for bcryptjs: 'password123' for admin and employee)
 INSERT INTO iam.roles (name, permissions) VALUES
-('Admin', '{"dashboard": "rw", "employee_list": "rw", "allocation": "rw", "administration": "rw"}'),
-('Employee', '{"dashboard": "r", "employee_list": "r", "allocation": "r", "administration": "none"}');
+('Admin', '{"dashboard": "rw", "employee_list": "rw", "allocation": "rw", "administration": "rw", "capacity_analysis": "rw", "cost_analysis": "rw"}'),
+('Employee', '{"dashboard": "r", "employee_list": "r", "allocation": "r", "administration": "none", "capacity_analysis": "r", "cost_analysis": "none"}');
 
 INSERT INTO iam.users (username, password, role_names) VALUES
 ('admin', '$2b$10$.FJD5rUILHS5pFXpn1Zgf.FADyIAp7xTph.32nb/0L99PmllMgqNa', ARRAY['Admin']),
@@ -166,6 +195,12 @@ INSERT INTO core.projects (id, name) VALUES
 ('00000000-0000-4000-a000-000000000001', 'Project Phoenix'), 
 ('00000000-0000-4000-a000-000000000002', 'Project Vibe'), 
 ('00000000-0000-4000-a000-000000000003', 'Internal Tools');
+
+INSERT INTO core.financial_years (name, start_date, end_date, is_current) VALUES
+('FY 2025-26', '2025-04-01', '2026-03-31', TRUE);
+
+INSERT INTO core.system_settings (key, value) VALUES
+('currency', 'USD');
 
 -- Dashboard Analytics Materialized View
 CREATE MATERIALIZED VIEW core.dashboard_analytics_summary AS
