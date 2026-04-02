@@ -98,8 +98,8 @@ const corsOptions = {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        // Allow localhost and specific domains
-        if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+        // Allow wildcard or specific domains
+        if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.indexOf(origin) !== -1) {
             return callback(null, true);
         }
 
