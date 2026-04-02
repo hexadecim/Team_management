@@ -157,8 +157,8 @@ INSERT INTO iam.roles (name, permissions) VALUES
 ('Employee', '{"dashboard": "r", "employee_list": "r", "allocation": "r", "administration": "none"}');
 
 INSERT INTO iam.users (username, password, role_names) VALUES
-('admin', '$2b$10$FAc39B0u9XId8gCcOI3yzekhYTzqeedtz9uyle.mzd4q/auQNV9Hu', ARRAY['Admin']),
-('employee', '$2b$10$FAc39B0u9XId8gCcOI3yzekhYTzqeedtz9uyle.mzd4q/auQNV9Hu', ARRAY['Employee']);
+('admin', '$2b$10$.FJD5rUILHS5pFXpn1Zgf.FADyIAp7xTph.32nb/0L99PmllMgqNa', ARRAY['Admin']),
+('employee', '$2b$10$.FJD5rUILHS5pFXpn1Zgf.FADyIAp7xTph.32nb/0L99PmllMgqNa', ARRAY['Employee']);
 
 INSERT INTO iam.user_roles (username, role_id) VALUES ('admin', 1), ('employee', 2);
 
