@@ -2,20 +2,23 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Copy shared and app package files from root context
+# Copy package files from root context for the entire workspace
+COPY package*.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/event-bus/package*.json ./apps/event-bus/
 
-# Install dependencies in the app directory
-WORKDIR /app/apps/event-bus
+# Install dependencies (NPM will automatically handle linking)
 RUN npm install
 
-# Copy source code from root context
-COPY packages/shared /app/packages/shared
-COPY apps/event-bus ./
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY apps/event-bus ./apps/event-bus
 
 # Expose port
 EXPOSE 4005
+
+# Set working directory to the app
+WORKDIR /app/apps/event-bus
 
 # Start the application
 CMD ["node", "index.js"]

@@ -1,4 +1,10 @@
 {
+  "name": "team-management-root",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "dependencies": {
     "axios": "^1.13.4",
     "nodemailer": "^8.0.0",
