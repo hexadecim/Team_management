@@ -32,6 +32,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4005
+      SMTP_ENCRYPTION_KEY: ${SMTP_ENCRYPTION_KEY:-8df85ca54199c193387c6fa242c755601dff8954769062a4d3397f7422321111}
     ports:
       - "4005:4005"
     networks:
