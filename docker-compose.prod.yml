@@ -53,6 +53,7 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      SMTP_ENCRYPTION_KEY: ${SMTP_ENCRYPTION_KEY:-8df85ca54199c193387c6fa242c755601dff8954769062a4d3397f7422321111}
     ports:
       - "4001:4001"
     depends_on:
