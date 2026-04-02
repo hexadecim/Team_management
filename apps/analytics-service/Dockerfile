@@ -1,26 +1,21 @@
 # Analytics Service Dockerfile
 FROM node:20-alpine
-
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy shared and app package files from root context
 COPY packages/shared/package*.json ./packages/shared/
+COPY apps/analytics-service/package*.json ./apps/analytics-service/
 
-# Install dependencies
+# Install dependencies in the app directory
+WORKDIR /app/apps/analytics-service
 RUN npm install
 
-# Copy shared package
-COPY packages/shared ./packages/shared
-
-# Copy application code
-COPY apps/analytics-service ./apps/analytics-service
+# Copy source code from root context
+COPY packages/shared /app/packages/shared
+COPY apps/analytics-service ./
 
 # Expose port
 EXPOSE 4002
-
-# Set working directory to analytics-service
-WORKDIR /app/apps/analytics-service
 
 # Start the application
 CMD ["node", "index.js"]

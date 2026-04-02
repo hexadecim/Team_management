@@ -1,26 +1,21 @@
 # Event Bus Dockerfile
 FROM node:20-alpine
-
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy shared and app package files from root context
 COPY packages/shared/package*.json ./packages/shared/
+COPY apps/event-bus/package*.json ./apps/event-bus/
 
-# Install dependencies
+# Install dependencies in the app directory
+WORKDIR /app/apps/event-bus
 RUN npm install
 
-# Copy shared package
-COPY packages/shared ./packages/shared
-
-# Copy application code
-COPY apps/event-bus ./apps/event-bus
+# Copy source code from root context
+COPY packages/shared /app/packages/shared
+COPY apps/event-bus ./
 
 # Expose port
 EXPOSE 4005
-
-# Set working directory to event-bus
-WORKDIR /app/apps/event-bus
 
 # Start the application
 CMD ["node", "index.js"]
