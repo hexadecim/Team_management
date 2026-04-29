@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
+    platform: linux/amd64
     image: postgres:16-alpine
     container_name: team-mgmt-db
     environment:
@@ -25,6 +26,7 @@ services:
 
   # Event Bus Service
   event-bus:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: apps/event-bus/Dockerfile
@@ -41,6 +43,7 @@ services:
 
   # Backend Resource Service
   backend:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: apps/resource-service/Dockerfile
@@ -69,6 +72,7 @@ services:
 
   # Analytics Service
   analytics:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: apps/analytics-service/Dockerfile
@@ -95,6 +99,7 @@ services:
 
   # Frontend Web Application
   frontend:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: apps/web/Dockerfile

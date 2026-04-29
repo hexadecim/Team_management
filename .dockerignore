@@ -1,5 +1,23 @@
-# Add .env file to gitignore
+# Dependencies
+node_modules
+**/node_modules
+
+# Build artifacts
+dist
+build
+*.log
+
+# Environment and Secrets
 .env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# OS Files
+.DS_Store
+Thumbs.db
 
 # Docker
 docker-compose.override.yml

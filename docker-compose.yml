@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
+    platform: linux/amd64
     image: postgres:16-alpine
     container_name: team-mgmt-db
     environment:
@@ -10,12 +11,12 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d team_management" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,6 +25,7 @@ services:
 
   # Backend Resource Service
   backend:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: apps/resource-service/Dockerfile
@@ -40,6 +42,7 @@ services:
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       SESSION_TIMEOUT_MINUTES: ${SESSION_TIMEOUT_MINUTES:-30}
+      SMTP_ENCRYPTION_KEY: ${SMTP_ENCRYPTION_KEY:-8df85ca54199c193387c6fa242c755601dff8954769062a4d3397f7422321111}
     ports:
       - "4001:4001"
     depends_on:
@@ -51,9 +54,10 @@ services:
 
   # Frontend Web Application
   frontend:
+    platform: linux/amd64
     build:
-      context: apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
     container_name: team-mgmt-frontend
     environment:
       VITE_API_BASE: http://localhost:4001

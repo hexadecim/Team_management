@@ -25,12 +25,8 @@ CREATE TABLE iam.user_roles (
 CREATE TABLE iam.user_projects (
     username VARCHAR(50) REFERENCES iam.users(username) ON DELETE CASCADE,
     project_id UUID,
-    PRIMARY KEY (username, role_id) -- Should be username, project_id but this is the current pattern in JS
+    PRIMARY KEY (username, project_id)
 );
-
--- Fix PRIMARY KEY for user_projects if needed
-ALTER TABLE iam.user_projects DROP CONSTRAINT IF EXISTS user_projects_pkey;
-ALTER TABLE iam.user_projects ADD PRIMARY KEY (username, project_id);
 
 CREATE TABLE iam.sessions (
     id SERIAL PRIMARY KEY,
