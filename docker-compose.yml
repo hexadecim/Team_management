@@ -43,6 +43,7 @@ services:
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       SESSION_TIMEOUT_MINUTES: ${SESSION_TIMEOUT_MINUTES:-30}
       SMTP_ENCRYPTION_KEY: ${SMTP_ENCRYPTION_KEY:-8df85ca54199c193387c6fa242c755601dff8954769062a4d3397f7422321111}
+      ALLOWED_ORIGINS: "*"
     ports:
       - "4001:4001"
     depends_on:
@@ -60,7 +61,7 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: team-mgmt-frontend
     environment:
-      VITE_API_BASE: http://localhost:4001
+      VITE_API_BASE: /api
     ports:
       - "80:80"
     depends_on:
